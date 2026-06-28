@@ -39,12 +39,18 @@ export default function NewShowModal({ onClose }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown on outside click
+  // Buyer autocomplete
+  interface PromoterHit { name: string; email: string; venue: string; city: string }
+  const [promoterHits, setPromoterHits] = useState<PromoterHit[]>([])
+  const [showBuyerDropdown, setShowBuyerDropdown] = useState(false)
+  const buyerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const buyerDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdowns on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false)
-      }
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setShowDropdown(false)
+      if (buyerDropdownRef.current && !buyerDropdownRef.current.contains(e.target as Node)) setShowBuyerDropdown(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -64,6 +70,26 @@ export default function NewShowModal({ onClose }: Props) {
       setSearching(false)
     }, 300)
   }, [])
+
+  const searchBuyers = useCallback((q: string) => {
+    if (buyerDebounceRef.current) clearTimeout(buyerDebounceRef.current)
+    if (q.length < 2) { setPromoterHits([]); setShowBuyerDropdown(false); return }
+    buyerDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/promoters?q=${encodeURIComponent(q)}`)
+        const data = await res.json()
+        setPromoterHits(data.promoters ?? [])
+        setShowBuyerDropdown(true)
+      } catch {}
+    }, 250)
+  }, [])
+
+  const selectBuyer = (p: { name: string; email: string }) => {
+    setBuyerName(p.name)
+    setBuyerEmail(p.email)
+    setShowBuyerDropdown(false)
+    setPromoterHits([])
+  }
 
   const selectVenue = async (p: Prediction) => {
     setVenue(p.name)
@@ -258,12 +284,31 @@ export default function NewShowModal({ onClose }: Props) {
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Buyer / Promoter</label>
                 <div className="grid grid-cols-2 gap-4">
-                  <input
-                    value={buyerName}
-                    onChange={e => setBuyerName(e.target.value)}
-                    placeholder="Full name"
-                    className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
-                  />
+                  <div className="relative" ref={buyerDropdownRef}>
+                    <input
+                      value={buyerName}
+                      onChange={e => { setBuyerName(e.target.value); searchBuyers(e.target.value) }}
+                      onFocus={() => promoterHits.length > 0 && setShowBuyerDropdown(true)}
+                      placeholder="Full name"
+                      autoComplete="off"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                    />
+                    {showBuyerDropdown && promoterHits.length > 0 && (
+                      <div className="absolute z-50 w-72 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                        {promoterHits.map((p, i) => (
+                          <button
+                            key={i}
+                            onMouseDown={() => selectBuyer(p)}
+                            className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                          >
+                            <div className="text-sm font-semibold text-gray-900">{p.name}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{p.email}</div>
+                            <div className="text-xs text-gray-400">{p.venue} · {p.city}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <input
                     type="email"
                     value={buyerEmail}
