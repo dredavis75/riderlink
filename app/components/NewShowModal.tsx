@@ -1,13 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, ChevronRight, CheckCircle2, Loader2 } from 'lucide-react'
+import { X, ChevronRight, CheckCircle2, Loader2, MapPin } from 'lucide-react'
 import { ARTIST_ROSTER, RIDER_TEMPLATES, type RiderTemplate } from '@/lib/data'
 import { createShow } from '@/lib/db'
 
 interface Props {
   onClose: () => void
+}
+
+interface Prediction {
+  placeId: string
+  name: string
+  secondary: string
 }
 
 const STEPS = ['Details', 'Rider'] as const
@@ -26,7 +32,52 @@ export default function NewShowModal({ onClose }: Props) {
   const [buyerName, setBuyerName] = useState('')
   const [buyerEmail, setBuyerEmail] = useState('')
 
-  // Step 2 — editable items
+  // Venue autocomplete
+  const [predictions, setPredictions] = useState<Prediction[]>([])
+  const [searching, setSearching] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const searchVenues = useCallback((q: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (q.length < 2) { setPredictions([]); setShowDropdown(false); return }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true)
+      try {
+        const res = await fetch(`/api/places?q=${encodeURIComponent(q)}`)
+        const data = await res.json()
+        setPredictions(data.predictions ?? [])
+        setShowDropdown(true)
+      } catch {}
+      setSearching(false)
+    }, 300)
+  }, [])
+
+  const selectVenue = async (p: Prediction) => {
+    setVenue(p.name)
+    setShowDropdown(false)
+    setPredictions([])
+    // Fetch city from place details
+    try {
+      const res = await fetch(`/api/places?placeId=${p.placeId}`)
+      const data = await res.json()
+      if (data.city) setCity(data.city)
+    } catch {}
+  }
+
+  // Step 2
   const defaultItems = (): RiderTemplate[] =>
     (RIDER_TEMPLATES[artist] ?? []).map(i => ({ ...i }))
 
@@ -145,26 +196,51 @@ export default function NewShowModal({ onClose }: Props) {
                 </div>
               </div>
 
-              {/* Venue + City */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Venue</label>
-                  <input
-                    value={venue}
-                    onChange={e => setVenue(e.target.value)}
-                    placeholder="State Farm Arena"
-                    className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
-                  />
+              {/* Venue autocomplete */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Venue</label>
+                <div className="relative" ref={dropdownRef}>
+                  <div className="relative">
+                    <input
+                      value={venue}
+                      onChange={e => { setVenue(e.target.value); searchVenues(e.target.value) }}
+                      onFocus={() => predictions.length > 0 && setShowDropdown(true)}
+                      placeholder="Start typing a venue name or city…"
+                      autoComplete="off"
+                      className="w-full px-3.5 py-2.5 pr-9 rounded-xl text-sm border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                    />
+                    {searching
+                      ? <Loader2 size={14} className="absolute right-3 top-3 animate-spin text-gray-400" />
+                      : <MapPin size={14} className="absolute right-3 top-3 text-gray-300" />
+                    }
+                  </div>
+
+                  {showDropdown && predictions.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                      {predictions.map(p => (
+                        <button
+                          key={p.placeId}
+                          onMouseDown={() => selectVenue(p)}
+                          className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                        >
+                          <div className="text-sm font-semibold text-gray-900">{p.name}</div>
+                          {p.secondary && <div className="text-xs text-gray-500 mt-0.5">{p.secondary}</div>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">City</label>
-                  <input
-                    value={city}
-                    onChange={e => setCity(e.target.value)}
-                    placeholder="Atlanta, GA"
-                    className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
-                  />
-                </div>
+              </div>
+
+              {/* City — auto-filled but editable */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">City</label>
+                <input
+                  value={city}
+                  onChange={e => setCity(e.target.value)}
+                  placeholder="Auto-filled when you pick a venue"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                />
               </div>
 
               {/* Date */}
@@ -202,7 +278,6 @@ export default function NewShowModal({ onClose }: Props) {
 
           {step === 1 && (
             <div className="space-y-4">
-              {/* Template toggle */}
               {RIDER_TEMPLATES[artist] && (
                 <div className="flex gap-3">
                   <button
@@ -220,7 +295,6 @@ export default function NewShowModal({ onClose }: Props) {
                 </div>
               )}
 
-              {/* Items list */}
               <div className="space-y-2">
                 {items.map((item, idx) => (
                   <div key={idx} className="flex gap-2 items-start bg-gray-50 rounded-xl p-3">
