@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Music2, MapPin, Calendar, CheckCircle2, Clock, AlertCircle, Bell, Plus, TrendingUp, Loader2 } from 'lucide-react'
+import { Music2, MapPin, Calendar, CheckCircle2, Clock, AlertCircle, Bell, Plus, TrendingUp, Loader2, BookOpen } from 'lucide-react'
 import { MOCK_SHOWS, SHOW_STATUS_CONFIG, type Show } from '@/lib/data'
 import { getShows, subscribeToAllShows } from '@/lib/db'
 import NewShowModal from '@/app/components/NewShowModal'
@@ -110,12 +110,20 @@ export default function Dashboard() {
             </div>
             <p className="text-xs text-gray-500">Blue Alley Touring</p>
           </div>
-          <button
-            onClick={() => setShowNewModal(true)}
-            className="flex items-center gap-2 bg-gray-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-700 transition-colors"
-          >
-            <Plus size={15} /> New Show
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push('/riders')}
+              className="flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              <BookOpen size={15} /> Rider Library
+            </button>
+            <button
+              onClick={() => setShowNewModal(true)}
+              className="flex items-center gap-2 bg-gray-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-700 transition-colors"
+            >
+              <Plus size={15} /> New Show
+            </button>
+          </div>
         </div>
       </header>
 

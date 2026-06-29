@@ -90,6 +90,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
               <div className="flex items-center gap-2 mb-1">
                 <h1 className="text-xl font-black text-gray-900">{show.artist}</h1>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
+                {show.riderVersion && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">v{show.riderVersion}</span>}
                 {live && <span className="flex items-center gap-1 text-xs text-green-600 font-medium"><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />Live</span>}
               </div>
               <p className="text-sm text-gray-500">{show.venue} · {show.city} · {new Date(show.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
@@ -104,6 +105,18 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
       </header>
 
       <div className="max-w-4xl mx-auto px-5 py-6">
+        {show.buyerApprovedAt && (
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2 text-sm text-green-700 font-medium">
+            <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+            <span>
+              Rider received by <strong>{show.buyerApprovedName}</strong>
+              {' · '}
+              {new Date(show.buyerApprovedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              {' at '}
+              {new Date(show.buyerApprovedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </span>
+          </div>
+        )}
         {issueCount > 0 && (
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5 flex items-center gap-2 text-sm text-red-700 font-medium">
             <AlertCircle size={15} />

@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, ShieldCheck } from 'lucide-react'
 import { MOCK_SHOWS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
-import { getShow, updateItem as dbUpdateItem, sendMessage as dbSendMessage, subscribeToShow } from '@/lib/db'
+import { getShow, updateItem as dbUpdateItem, sendMessage as dbSendMessage, subscribeToShow, approveRider } from '@/lib/db'
 import { isConfigured } from '@/lib/supabase'
 import type { NotifyPayload } from '@/app/api/notify/route'
 
@@ -15,11 +15,11 @@ function groupByCategory(items: RiderItem[]) {
   }, {})
 }
 
-const BUYER_STATUS_OPTIONS: { value: ItemStatus; label: string; icon: React.ReactNode; color: string }[] = [
-  { value: 'confirmed',   label: 'Confirmed',   icon: <CheckCircle2 size={14} />, color: 'text-green-600 bg-green-50 border-green-300' },
-  { value: 'unavailable', label: 'Unavailable',  icon: <XCircle size={14} />,      color: 'text-red-600 bg-red-50 border-red-300' },
-  { value: 'substituted', label: 'Substituting', icon: <RefreshCw size={14} />,    color: 'text-blue-600 bg-blue-50 border-blue-300' },
-  { value: 'pending',     label: 'Pending',      icon: <Clock size={14} />,         color: 'text-gray-500 bg-gray-50 border-gray-300' },
+const BUYER_STATUS_OPTIONS: { value: ItemStatus; label: string; color: string }[] = [
+  { value: 'confirmed',   label: 'Confirmed',   color: 'text-green-600 bg-green-50 border-green-300' },
+  { value: 'unavailable', label: 'Unavailable',  color: 'text-red-600 bg-red-50 border-red-300' },
+  { value: 'substituted', label: 'Substituting', color: 'text-blue-600 bg-blue-50 border-blue-300' },
+  { value: 'pending',     label: 'Pending',      color: 'text-gray-500 bg-gray-50 border-gray-300' },
 ]
 
 async function notify(payload: NotifyPayload) {
@@ -29,9 +29,7 @@ async function notify(payload: NotifyPayload) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-  } catch {
-    // notifications are best-effort
-  }
+  } catch {}
 }
 
 export default function BuyerPortal({ params }: { params: Promise<{ id: string }> }) {
@@ -44,8 +42,9 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
   const [expandedItem, setExpandedItem] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [approving, setApproving] = useState(false)
+  const [approved, setApproved] = useState(false)
+  const [approvedAt, setApprovedAt] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -55,6 +54,10 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
           setShow(data)
           setItems(data.items)
           setMessages(data.messages)
+          if (data.buyerApprovedAt) {
+            setApproved(true)
+            setApprovedAt(data.buyerApprovedAt)
+          }
         }
       } else {
         const mock = MOCK_SHOWS.find(s => s.id === id) ?? null
@@ -71,9 +74,7 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
     if (!isConfigured) return
     const unsub = subscribeToShow(id, async () => {
       const data = await getShow(id)
-      if (data) {
-        setMessages(data.messages)
-      }
+      if (data) setMessages(data.messages)
     })
     return unsub
   }, [id])
@@ -128,13 +129,17 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
     setSending(false)
   }
 
-  async function handleSubmit() {
+  async function handleApprove() {
     if (!show) return
-    setSubmitting(true)
+    setApproving(true)
 
-    const flaggedItems = items
-      .filter(i => i.status === 'unavailable' || i.status === 'substituted')
-      .map(i => ({ name: i.name, status: i.status, note: i.buyerNote }))
+    if (isConfigured) {
+      try { await approveRider(show.id, show.buyerName) } catch {}
+    }
+
+    const now = new Date().toISOString()
+    setApproved(true)
+    setApprovedAt(now)
 
     notify({
       type: 'rider_submitted',
@@ -144,13 +149,14 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
       city: show.city,
       date: show.date,
       buyerName: show.buyerName,
-      flaggedItems,
+      flaggedItems: items
+        .filter(i => i.status === 'unavailable' || i.status === 'substituted')
+        .map(i => ({ name: i.name, status: i.status, note: i.buyerNote })),
       confirmedCount: items.filter(i => i.status === 'confirmed').length,
       totalCount: items.length,
     })
 
-    setSubmitted(true)
-    setSubmitting(false)
+    setApproving(false)
   }
 
   if (loading) {
@@ -175,37 +181,56 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
       {/* Header */}
       <div className="bg-gray-900 text-white">
         <div className="max-w-2xl mx-auto px-5 py-6">
-          <div className="text-xs font-semibold tracking-widest text-gray-400 uppercase mb-1">Hospitality Rider</div>
+          <div className="text-xs font-semibold tracking-widest text-gray-400 uppercase mb-1">
+            Show Rider {show.riderVersion ? `· v${show.riderVersion}` : ''}
+          </div>
           <h1 className="text-2xl font-black tracking-tight mb-1">{show.artist}</h1>
           <p className="text-gray-300 text-sm">{show.venue} · {show.city}</p>
           <p className="text-gray-400 text-sm">
             {new Date(show.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </p>
-          <div className="mt-5">
-            <div className="flex justify-between text-xs text-gray-400 mb-2">
-              <span>{confirmed} of {total} items confirmed</span>
-              <span>{pct}%</span>
+          {!approved && (
+            <div className="mt-5">
+              <div className="flex justify-between text-xs text-gray-400 mb-2">
+                <span>{confirmed} of {total} items responded</span>
+                <span>{pct}%</span>
+              </div>
+              <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-full bg-green-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+              </div>
             </div>
-            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-              <div className="h-full bg-green-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-5 py-6 space-y-6">
-        {submitted ? (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-8 text-center">
-            <CheckCircle2 size={40} className="text-green-500 mx-auto mb-3" />
-            <h2 className="text-lg font-bold text-gray-900 mb-1">Response submitted!</h2>
-            <p className="text-sm text-gray-500">The tour manager has been notified. They may follow up if any items need clarification.</p>
+
+        {/* Already received — confirmation state */}
+        {approved ? (
+          <div className="bg-gray-900 text-white rounded-2xl p-8 text-center">
+            <CheckCircle2 size={44} className="text-green-400 mx-auto mb-3" />
+            <h2 className="text-lg font-black mb-1">Rider Received</h2>
+            <p className="text-sm text-gray-300 mb-1">
+              Confirmed by <strong>{show.buyerName}</strong>
+            </p>
+            {approvedAt && (
+              <p className="text-xs text-gray-400">
+                {new Date(approvedAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                {' at '}
+                {new Date(approvedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}
+              </p>
+            )}
+            <p className="text-xs text-gray-500 mt-3">
+              The tour manager has been notified.
+            </p>
           </div>
         ) : (
           <>
             <p className="text-sm text-gray-600 bg-white border border-gray-200 rounded-xl px-4 py-3">
-              Please confirm each item below. If something is unavailable, mark it and leave a note with what you can offer instead.
+              Review each item below and mark it confirmed, unavailable, or substituted. When done, approve the full rider at the bottom.
             </p>
 
+            {/* Rider items by category */}
             {Object.entries(grouped).map(([category, catItems]) => (
               <div key={category} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                 <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
@@ -242,7 +267,7 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
                         {isExpanded && (
                           <div className="mt-3">
                             <input
-                              placeholder={item.status === 'substituted' ? 'What can you substitute?' : 'Add a note for the tour manager...'}
+                              placeholder={item.status === 'substituted' ? 'What can you substitute?' : 'Add a note for the tour manager…'}
                               value={item.buyerNote}
                               onChange={e => handleNoteChange(item, e.target.value)}
                               className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
@@ -279,7 +304,7 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
                     value={newMessage}
                     onChange={e => setNewMessage(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                    placeholder="Send a message..."
+                    placeholder="Send a message…"
                     className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
                   />
                   <button
@@ -293,12 +318,16 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
               </div>
             </div>
 
+            {/* Received button */}
             <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="w-full bg-gray-900 text-white font-bold py-4 rounded-2xl hover:bg-gray-700 transition-colors text-sm tracking-wide disabled:opacity-40 flex items-center justify-center gap-2"
+              onClick={handleApprove}
+              disabled={approving}
+              className="w-full bg-gray-900 text-white font-black py-4 rounded-2xl hover:bg-gray-700 transition-colors text-sm tracking-wide disabled:opacity-40 flex items-center justify-center gap-2"
             >
-              {submitting ? <><Loader2 size={15} className="animate-spin" /> Submitting…</> : 'Submit Rider Response'}
+              {approving
+                ? <><Loader2 size={15} className="animate-spin" /> Confirming…</>
+                : <><CheckCircle2 size={16} /> Confirm Rider Received</>
+              }
             </button>
           </>
         )}

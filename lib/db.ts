@@ -1,18 +1,10 @@
 import { supabase, isConfigured } from './supabase'
-import type { Show, RiderItem, Message, ItemStatus } from './data'
+import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem, RiderTemplate } from './data'
 
-// ── Shows ────────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-export async function getShows(): Promise<Show[]> {
-  if (!isConfigured) throw new Error('Supabase not configured')
-  const { data: shows, error } = await supabase
-    .from('shows')
-    .select('*, rider_items(*), messages(*)')
-    .order('date', { ascending: true })
-
-  if (error) throw error
-
-  return (shows ?? []).map(row => ({
+function mapShow(row: any): Show {
+  return {
     id: row.id,
     artist: row.artist,
     venue: row.venue,
@@ -21,6 +13,9 @@ export async function getShows(): Promise<Show[]> {
     buyerName: row.buyer_name,
     buyerEmail: row.buyer_email,
     status: row.status,
+    buyerApprovedAt: row.buyer_approved_at ?? undefined,
+    buyerApprovedName: row.buyer_approved_name ?? undefined,
+    riderVersion: row.rider_version ?? undefined,
     items: (row.rider_items ?? [])
       .sort((a: any, b: any) => a.sort_order - b.sort_order)
       .map((i: any): RiderItem => ({
@@ -41,7 +36,21 @@ export async function getShows(): Promise<Show[]> {
         text: m.text,
         timestamp: m.created_at,
       })),
-  }))
+  }
+}
+
+// ── Shows ────────────────────────────────────────────────────────────────────
+
+export async function getShows(): Promise<Show[]> {
+  if (!isConfigured) throw new Error('Supabase not configured')
+  const { data: shows, error } = await supabase
+    .from('shows')
+    .select('*, rider_items(*), messages(*)')
+    .order('date', { ascending: true })
+
+  if (error) throw error
+
+  return (shows ?? []).map(row => mapShow(row))
 }
 
 export async function getShow(id: string): Promise<Show | null> {
@@ -53,37 +62,7 @@ export async function getShow(id: string): Promise<Show | null> {
     .single()
 
   if (error || !data) return null
-
-  return {
-    id: data.id,
-    artist: data.artist,
-    venue: data.venue,
-    city: data.city,
-    date: data.date,
-    buyerName: data.buyer_name,
-    buyerEmail: data.buyer_email,
-    status: data.status,
-    items: (data.rider_items ?? [])
-      .sort((a: any, b: any) => a.sort_order - b.sort_order)
-      .map((i: any): RiderItem => ({
-        id: i.id,
-        category: i.category,
-        name: i.name,
-        quantity: i.quantity,
-        notes: i.notes ?? '',
-        status: i.status,
-        buyerNote: i.buyer_note ?? '',
-      })),
-    messages: (data.messages ?? [])
-      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-      .map((m: any): Message => ({
-        id: m.id,
-        from: m.from_role,
-        sender: m.sender,
-        text: m.text,
-        timestamp: m.created_at,
-      })),
-  }
+  return mapShow(data)
 }
 
 export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages'> & { items: Omit<RiderItem, 'id'>[] }): Promise<string> {
@@ -152,6 +131,148 @@ export async function sendMessage(showId: string, from: 'manager' | 'buyer', sen
     text: data.text,
     timestamp: data.created_at,
   }
+}
+
+// ── Buyer Approval ────────────────────────────────────────────────────────────
+
+export async function approveRider(showId: string, buyerName: string) {
+  const { error } = await supabase
+    .from('shows')
+    .update({
+      buyer_approved_at: new Date().toISOString(),
+      buyer_approved_name: buyerName,
+      status: 'confirmed',
+    })
+    .eq('id', showId)
+  if (error) throw error
+}
+
+// ── Master Riders ─────────────────────────────────────────────────────────────
+
+function mapMasterRider(row: any): MasterRider {
+  return {
+    id: row.id,
+    artist: row.artist,
+    version: row.version,
+    updatedAt: row.updated_at,
+    items: (row.rider_master_items ?? [])
+      .sort((a: any, b: any) => a.sort_order - b.sort_order)
+      .map((i: any): MasterRiderItem => ({
+        id: i.id,
+        masterId: i.master_id,
+        category: i.category,
+        name: i.name,
+        quantity: i.quantity,
+        notes: i.notes ?? '',
+        sortOrder: i.sort_order,
+      })),
+  }
+}
+
+export async function getRiderMasters(): Promise<MasterRider[]> {
+  const { data, error } = await supabase
+    .from('rider_masters')
+    .select('*, rider_master_items(*)')
+    .order('artist')
+  if (error) throw error
+  return (data ?? []).map(mapMasterRider)
+}
+
+export async function getRiderMaster(artist: string): Promise<MasterRider | null> {
+  const { data, error } = await supabase
+    .from('rider_masters')
+    .select('*, rider_master_items(*)')
+    .eq('artist', artist)
+    .single()
+  if (error || !data) return null
+  return mapMasterRider(data)
+}
+
+export async function seedRiderMasters(templates: Record<string, RiderTemplate[]>): Promise<void> {
+  for (const [artist, items] of Object.entries(templates)) {
+    const { data: existing } = await supabase
+      .from('rider_masters')
+      .select('id')
+      .eq('artist', artist)
+      .single()
+
+    let masterId: string
+    if (existing) {
+      masterId = existing.id
+    } else {
+      const { data, error } = await supabase
+        .from('rider_masters')
+        .insert({ artist, version: '1.0' })
+        .select('id')
+        .single()
+      if (error || !data) continue
+      masterId = data.id
+    }
+
+    // Delete existing items and re-seed
+    await supabase.from('rider_master_items').delete().eq('master_id', masterId)
+    if (items.length > 0) {
+      await supabase.from('rider_master_items').insert(
+        items.map((item, idx) => ({
+          master_id: masterId,
+          category: item.category,
+          name: item.name,
+          quantity: item.quantity,
+          notes: item.notes,
+          sort_order: idx,
+        }))
+      )
+    }
+  }
+}
+
+export async function addMasterItem(
+  masterId: string,
+  item: Pick<MasterRiderItem, 'category' | 'name' | 'quantity' | 'notes'>,
+  sortOrder: number
+): Promise<MasterRiderItem> {
+  const { data, error } = await supabase
+    .from('rider_master_items')
+    .insert({ master_id: masterId, ...item, sort_order: sortOrder })
+    .select()
+    .single()
+  if (error || !data) throw error
+  return {
+    id: data.id,
+    masterId: data.master_id,
+    category: data.category,
+    name: data.name,
+    quantity: data.quantity,
+    notes: data.notes ?? '',
+    sortOrder: data.sort_order,
+  }
+}
+
+export async function updateMasterItem(
+  itemId: string,
+  fields: Partial<Pick<MasterRiderItem, 'category' | 'name' | 'quantity' | 'notes' | 'sortOrder'>>
+): Promise<void> {
+  const dbFields: Record<string, unknown> = {}
+  if (fields.category !== undefined) dbFields.category = fields.category
+  if (fields.name !== undefined) dbFields.name = fields.name
+  if (fields.quantity !== undefined) dbFields.quantity = fields.quantity
+  if (fields.notes !== undefined) dbFields.notes = fields.notes
+  if (fields.sortOrder !== undefined) dbFields.sort_order = fields.sortOrder
+  const { error } = await supabase.from('rider_master_items').update(dbFields).eq('id', itemId)
+  if (error) throw error
+}
+
+export async function deleteMasterItem(itemId: string): Promise<void> {
+  const { error } = await supabase.from('rider_master_items').delete().eq('id', itemId)
+  if (error) throw error
+}
+
+export async function bumpMasterVersion(masterId: string, newVersion: string): Promise<void> {
+  const { error } = await supabase
+    .from('rider_masters')
+    .update({ version: newVersion, updated_at: new Date().toISOString() })
+    .eq('id', masterId)
+  if (error) throw error
 }
 
 // ── Real-time subscriptions ───────────────────────────────────────────────────
