@@ -17,7 +17,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   Other: '📦',
 }
 
-const CACHE_VERSION = 'v6'
+const CACHE_VERSION = 'v7'
 const imageCache = new Map<string, string | null>()
 const pending = new Map<string, Promise<string | null>>()
 
@@ -25,7 +25,7 @@ function resolveImage(name: string, category: string): Promise<string | null> {
   const key = `${CACHE_VERSION}:${name.toLowerCase()}`
   if (imageCache.has(key)) return Promise.resolve(imageCache.get(key)!)
   if (pending.has(key)) return pending.get(key)!
-  const p = fetch(`/api/product-image?v=6&q=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}`)
+  const p = fetch(`/api/product-image?v=7&q=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}`)
     .then(r => r.json())
     .then(d => { imageCache.set(key, d.imageUrl ?? null); return d.imageUrl ?? null })
     .catch(() => { imageCache.set(key, null); return null })

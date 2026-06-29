@@ -26,8 +26,8 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/ginger beer|ginger ale|ginger juice/i,         '/rider-logos/GINGER.jpeg'],
 
   // Assorted / mixed sodas
-  [/assort\w* soda|mix\w* soda|variety.* soda|soda.*(variety|assort|mix)/i, '/rider-logos/COKE.jpeg'],
-  [/cases? of (soda|pop)|soda cases?/i,            '/rider-logos/COKE.jpeg'],
+  [/assort\w* soda|mix\w* soda|variety.* soda|soda.*(variety|assort|mix)/i, '/rider-logos/ASSORTMENT OF SODAS.webp'],
+  [/cases? of (soda|pop)|soda cases?/i,            '/rider-logos/ASSORTMENT OF SODAS.webp'],
 
   // Specific bottled water brands / cases
   [/essentia/i,                                    '/rider-logos/ESSENTIA BOTTLED WATER.jpg'],
@@ -47,6 +47,12 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   // ── Food ───────────────────────────────────────────────────────────────────
   [/\bpizza\b/i,                                   '/rider-logos/PIZZA.jpg'],
   [/wings?|chicken wings?/i,                       '/rider-logos/WINGS.jpeg'],
+  [/fish (and|&) chicken|fried fish|catfish|tilapia/i, '/rider-logos/FISH AND CHICKEN.jpg'],
+  [/\bfish\b/i,                                    '/rider-logos/FISH AND CHICKEN.jpg'],
+  [/rolls? with butter|dinner rolls?|bread rolls?|\brolls?\b/i, '/rider-logos/ROLLS WITH BUTTER.jpg'],
+  [/snack platter|snack tray|\bsnacks?\b/i,        '/rider-logos/SNACK PLATTER.jpg'],
+  [/vegetables? and rice|vegg?ies? and rice|rice (and|with) vegg?\w*|\brice\b/i, '/rider-logos/VEGEATBLES AND RICE.jpg'],
+  [/condiments?|ketchup|mustard|hot sauce|\bsauces?\b/i, '/rider-logos/CONDIMENTS.jpg'],
   [/fruit tray|fruit platter|fruit bowl/i,         '/rider-logos/FRUIT TRAY.jpeg'],
   [/veggie tray|vegetable tray|crudite/i,          '/rider-logos/VEGGIE TRAY.jpeg'],
   [/deli tray|cold cuts|charcuterie/i,             '/rider-logos/DELI TRAY.jpeg'],
@@ -69,6 +75,7 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/\bgum\b|chewing gum/i,                         '/rider-logos/GUM.jpeg'],
 
   // ── Dressing room / essentials ─────────────────────────────────────────────
+  [/dressing room|green room/i,                    '/rider-logos/DRRESSING ROOM.jpg'],
   [/candles?/i,                                    '/rider-logos/CANDLE.jpg'],
   [/solo cups?|red cups?|plastic cups?/i,          '/rider-logos/SOLO RED CUPS.jpeg'],
   [/\bcups?\b/i,                                   '/rider-logos/SOLO RED CUPS.jpeg'],
