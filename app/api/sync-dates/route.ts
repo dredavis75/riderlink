@@ -4,7 +4,7 @@ export const maxDuration = 60
 
 export interface TourDate {
   sourceId: string
-  source: 'bandsintown' | 'songkick' | 'ticketmaster' | 'seatgeek'
+  source: 'bandsintown' | 'ticketmaster' | 'seatgeek'
   artist: string
   venue: string
   city: string
@@ -39,46 +39,6 @@ async function fetchBandsintown(artist: string): Promise<TourDate[]> {
           : 'confirmed') as TourDate['status'],
     ticketUrl: e.url,
     onSale: !!e.offers?.length,
-  })).filter(e => e.date)
-}
-
-// ── Songkick (requires free API key) ─────────────────────────────────────────
-
-async function fetchSongkick(artist: string): Promise<TourDate[]> {
-  const key = process.env.SONGKICK_API_KEY
-  if (!key) return []
-  // Step 1: search for artist
-  const searchRes = await fetch(
-    `https://api.songkick.com/api/3.0/search/artists.json?query=${encodeURIComponent(artist)}&apikey=${key}`
-  )
-  if (!searchRes.ok) return []
-  const searchData = await searchRes.json()
-  const artists = searchData?.resultsPage?.results?.artist
-  if (!artists?.length) return []
-
-  const skArtistId = artists[0].id
-
-  // Step 2: get upcoming events
-  const evRes = await fetch(
-    `https://api.songkick.com/api/3.0/artists/${skArtistId}/calendar.json?apikey=${key}`
-  )
-  if (!evRes.ok) return []
-  const evData = await evRes.json()
-  const events = evData?.resultsPage?.results?.event
-  if (!Array.isArray(events)) return []
-
-  return events.map((e: any) => ({
-    sourceId: `sk-${e.id}`,
-    source: 'songkick' as const,
-    artist,
-    venue: e.venue?.displayName ?? '',
-    city: e.location?.city?.split(',')[0] ?? '',
-    country: e.location?.city?.split(', ').pop() ?? '',
-    date: e.start?.date ?? '',
-    time: e.start?.time?.slice(0, 5),
-    status: (e.status === 'cancelled' ? 'cancelled' : 'confirmed') as TourDate['status'],
-    ticketUrl: e.uri,
-    onSale: e.status === 'ok',
   })).filter(e => e.date)
 }
 
@@ -173,7 +133,6 @@ export async function GET(req: NextRequest) {
   const results = await Promise.allSettled(
     artists.flatMap(artist => [
       fetchBandsintown(artist),
-      fetchSongkick(artist),
       fetchTicketmaster(artist),
       fetchSeatGeek(artist),
     ])
@@ -187,8 +146,7 @@ export async function GET(req: NextRequest) {
   const deduped = deduplicate(allDates)
 
   const sources = {
-    bandsintown: !!(true), // always available
-    songkick: !!process.env.SONGKICK_API_KEY,
+    bandsintown: true,
     ticketmaster: !!process.env.TICKETMASTER_API_KEY,
     seatgeek: !!process.env.SEATGEEK_CLIENT_ID,
   }

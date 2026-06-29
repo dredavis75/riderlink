@@ -8,14 +8,12 @@ import ArtistAvatar from './ArtistAvatar'
 
 const SOURCE_LABEL: Record<string, string> = {
   bandsintown: 'Bandsintown',
-  songkick: 'Songkick',
   ticketmaster: 'Ticketmaster',
   seatgeek: 'SeatGeek',
 }
 
 const SOURCE_COLOR: Record<string, string> = {
   bandsintown: 'bg-teal-50 text-teal-700 border-teal-200',
-  songkick: 'bg-pink-50 text-pink-700 border-pink-200',
   ticketmaster: 'bg-blue-50 text-blue-700 border-blue-200',
   seatgeek: 'bg-violet-50 text-violet-700 border-violet-200',
 }
