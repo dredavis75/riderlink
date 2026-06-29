@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, Download, Zap } from 'lucide-react'
-import { MOCK_SHOWS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
+import { MOCK_SHOWS, OFFICIAL_RIDER_PDFS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
 import { getShow, updateItem as dbUpdateItem, sendMessage as dbSendMessage, subscribeToShow, approveRider } from '@/lib/db'
 import { isConfigured } from '@/lib/supabase'
 import type { NotifyPayload } from '@/app/api/notify/route'
@@ -197,14 +197,6 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
                 {new Date(show.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               </p>
             </div>
-            <a
-              href={`/api/pdf/${show.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-all"
-            >
-              <Download size={13} /> PDF
-            </a>
           </div>
           {!approved && (
             <div>
@@ -221,6 +213,27 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
       </div>
 
       <div className="max-w-2xl mx-auto px-5 py-6 space-y-6">
+
+        {/* Official rider PDF download */}
+        {OFFICIAL_RIDER_PDFS[show.artist] && (
+          <a
+            href={OFFICIAL_RIDER_PDFS[show.artist]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between gap-4 bg-gray-900 hover:bg-gray-800 text-white rounded-2xl px-5 py-4 transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shrink-0 shadow-md shadow-amber-500/30">
+                <Download size={18} className="text-gray-950" />
+              </div>
+              <div>
+                <div className="font-black text-sm">Official Show Rider</div>
+                <div className="text-xs text-gray-400 mt-0.5">{show.artist} · Full rider document · PDF</div>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-amber-500 group-hover:text-amber-400 transition-colors shrink-0">Download →</span>
+          </a>
+        )}
 
         {/* Already received — confirmation state */}
         {approved ? (

@@ -177,6 +177,11 @@ export type RiderTemplate = { category: string; name: string; quantity: string; 
 
 export const ARTIST_ROSTER = ['SKRILLA', 'G Herbo', 'Keyshia Cole', 'Flo Milli', 'K. Michelle', 'RL', 'NEXT'] as const
 
+// Official rider PDFs served from /public/riders/ — keyed by artist name
+export const OFFICIAL_RIDER_PDFS: Record<string, string> = {
+  'G Herbo': '/riders/g-herbo-2026.pdf',
+}
+
 export const RIDER_TEMPLATES: Record<string, RiderTemplate[]> = {
   'SKRILLA': [
     { category: 'Food',       name: 'Wings',                  quantity: '50 pcs',    notes: 'Lemon pepper dry' },
