@@ -34,9 +34,9 @@ async function fetchBandsintown(artist: string): Promise<TourDate[]> {
     country: e.venue?.country ?? '',
     date: e.datetime?.split('T')[0] ?? '',
     time: e.datetime?.split('T')[1]?.slice(0, 5),
-    status: e.status === 'cancelled' ? 'cancelled'
+    status: (e.status === 'cancelled' ? 'cancelled'
           : e.status === 'postponed' ? 'postponed'
-          : 'confirmed',
+          : 'confirmed') as TourDate['status'],
     ticketUrl: e.url,
     onSale: !!e.offers?.length,
   })).filter(e => e.date)
@@ -76,7 +76,7 @@ async function fetchSongkick(artist: string): Promise<TourDate[]> {
     country: e.location?.city?.split(', ').pop() ?? '',
     date: e.start?.date ?? '',
     time: e.start?.time?.slice(0, 5),
-    status: e.status === 'cancelled' ? 'cancelled' : 'confirmed',
+    status: (e.status === 'cancelled' ? 'cancelled' : 'confirmed') as TourDate['status'],
     ticketUrl: e.uri,
     onSale: e.status === 'ok',
   })).filter(e => e.date)
@@ -105,9 +105,9 @@ async function fetchTicketmaster(artist: string): Promise<TourDate[]> {
       country: venue?.country?.countryCode ?? '',
       date: e.dates?.start?.localDate ?? '',
       time: e.dates?.start?.localTime?.slice(0, 5),
-      status: e.dates?.status?.code === 'cancelled' ? 'cancelled'
+      status: (e.dates?.status?.code === 'cancelled' ? 'cancelled'
             : e.dates?.status?.code === 'postponed' ? 'postponed'
-            : 'confirmed',
+            : 'confirmed') as TourDate['status'],
       ticketUrl: e.url,
       onSale: e.dates?.status?.code === 'onsale',
     }
@@ -125,7 +125,7 @@ async function fetchSeatGeek(artist: string): Promise<TourDate[]> {
   const data = await res.json()
   if (!Array.isArray(data?.events)) return []
 
-  return data.events.map((e: any) => ({
+  return (data.events as any[]).map((e) => ({
     sourceId: `sg-${e.id}`,
     source: 'seatgeek' as const,
     artist,
@@ -134,7 +134,7 @@ async function fetchSeatGeek(artist: string): Promise<TourDate[]> {
     country: e.venue?.country ?? '',
     date: e.datetime_local?.split('T')[0] ?? '',
     time: e.datetime_local?.split('T')[1]?.slice(0, 5),
-    status: e.status === 'cancelled' ? 'cancelled' : 'confirmed',
+    status: (e.status === 'cancelled' ? 'cancelled' : 'confirmed') as TourDate['status'],
     ticketUrl: e.url,
     onSale: e.stats?.listing_count > 0,
   })).filter(e => e.date)
