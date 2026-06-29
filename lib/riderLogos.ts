@@ -6,10 +6,12 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/1942|don julio 1942/i,                         '/rider-logos/1942.PNG'],
   [/1738|r[eé]my martin 1738/i,                    '/rider-logos/1738.jpeg'],
   [/vsop|hennessy vsop/i,                          '/rider-logos/VSOP.jpeg'],
-  // User will drop these in the RIDER LOGOS folder — filenames expected:
-  [/dom p[eé]rignon|dom p/i,                       '/rider-logos/DOM PERIGNON.jpeg'],
-  [/clase azul/i,                                  '/rider-logos/CLASE AZUL.jpeg'],
-  [/casamigos|casa migos/i,                        '/rider-logos/CASAMIGOS.jpeg'],
+  [/dom p[eé]rignon|dom p\b/i,                     '/rider-logos/DOM PERIGNON.webp'],
+  [/clase azul/i,                                  '/rider-logos/CLASE AZUL.webp'],
+  [/casamigos|casa migos/i,                        '/rider-logos/CASA MIGOS.webp'],
+
+  // Production
+  [/camera|video recorder|camcorder/i,             '/rider-logos/VIDEO CAMERA.jpeg'],
 
   // ── Beverages — branded ────────────────────────────────────────────────────
   [/red bull/i,                                    '/rider-logos/RED BULL.jpeg'],
