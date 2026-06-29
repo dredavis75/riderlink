@@ -12,13 +12,6 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
@@ -27,4 +20,28 @@ body {
 
 input, textarea, select {
   color: #111827;
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fill-bar {
+  from { width: 0%; }
+}
+
+.animate-slide-up  { animation: slide-up 0.35s ease-out both; }
+.animate-fade-in   { animation: fade-in 0.25s ease-out both; }
+.fill-bar          { animation: fill-bar 0.8s cubic-bezier(.4,0,.2,1) both; }
+
+/* Dot grid overlay */
+.dot-grid {
+  background-image: radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
 }

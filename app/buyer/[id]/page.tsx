@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, Download } from 'lucide-react'
+import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, Download, Zap } from 'lucide-react'
 import { MOCK_SHOWS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
 import { getShow, updateItem as dbUpdateItem, sendMessage as dbSendMessage, subscribeToShow, approveRider } from '@/lib/db'
 import { isConfigured } from '@/lib/supabase'
@@ -179,16 +179,21 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gray-900 text-white">
-        <div className="max-w-2xl mx-auto px-5 py-6">
-          <div className="flex items-start justify-between gap-4">
+      <div className="relative bg-gray-950 overflow-hidden">
+        <div className="absolute inset-0 dot-grid" />
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900/80 via-transparent to-black/60 pointer-events-none" />
+        <div className="relative max-w-2xl mx-auto px-5 py-7">
+          <div className="flex items-start justify-between gap-4 mb-5">
             <div>
-              <div className="text-xs font-semibold tracking-widest text-gray-400 uppercase mb-1">
-                Show Rider {show.riderVersion ? `· v${show.riderVersion}` : ''}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center">
+                  <Zap size={14} className="text-gray-950" fill="currentColor" />
+                </div>
+                <span className="text-xs font-black text-amber-500 tracking-widest uppercase">Show Rider{show.riderVersion ? ` · v${show.riderVersion}` : ''}</span>
               </div>
-              <h1 className="text-2xl font-black tracking-tight mb-1">{show.artist}</h1>
+              <h1 className="text-3xl font-black text-white tracking-tight leading-none mb-1">{show.artist}</h1>
               <p className="text-gray-300 text-sm">{show.venue} · {show.city}</p>
-              <p className="text-gray-400 text-sm">
+              <p className="text-gray-500 text-xs mt-0.5">
                 {new Date(show.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               </p>
             </div>
@@ -196,19 +201,19 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
               href={`/api/pdf/${show.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors mt-1"
+              className="shrink-0 flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-all"
             >
-              <Download size={13} /> Download PDF
+              <Download size={13} /> PDF
             </a>
           </div>
           {!approved && (
-            <div className="mt-5">
-              <div className="flex justify-between text-xs text-gray-400 mb-2">
+            <div>
+              <div className="flex justify-between text-xs text-gray-500 mb-2">
                 <span>{confirmed} of {total} items responded</span>
-                <span>{pct}%</span>
+                <span className="font-bold text-gray-300">{pct}%</span>
               </div>
-              <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                <div className="h-full bg-green-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full fill-bar" style={{ width: `${pct}%` }} />
               </div>
             </div>
           )}
