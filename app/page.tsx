@@ -6,13 +6,15 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   MapPin, AlertCircle, Bell, Plus, TrendingUp,
-  Loader2, BookOpen, Zap, Music2, Download, FileUp, Trash2, Pencil,
+  Loader2, BookOpen, Zap, Music2, Download, FileUp, Trash2, Pencil, RefreshCw,
 } from 'lucide-react'
 import { MOCK_SHOWS, SHOW_STATUS_CONFIG, type Show, type RiderPdfSection } from '@/lib/data'
-import { getShows, subscribeToAllShows, getSectionsForShows, addSection, deleteSection, updateSectionLabel } from '@/lib/db'
+import { getShows, subscribeToAllShows, getSectionsForShows, addSection, deleteSection, updateSectionLabel, createShow } from '@/lib/db'
 import { supabase, isConfigured } from '@/lib/supabase'
 import NewShowModal from '@/app/components/NewShowModal'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
+import SyncDatesModal from '@/app/components/SyncDatesModal'
+import type { TourDate } from '@/app/api/sync-dates/route'
 
 const STATUS_BORDER: Record<string, string> = {
   draft:     'border-l-gray-400',
@@ -264,7 +266,8 @@ export default function Dashboard() {
   const [sections, setSections]     = useState<Record<string, RiderPdfSection[]>>({})
   const [loading, setLoading]       = useState(true)
   const [live, setLive]             = useState(false)
-  const [showNewModal, setShowNewModal] = useState(false)
+  const [showNewModal, setShowNewModal]   = useState(false)
+  const [showSyncModal, setShowSyncModal] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -290,6 +293,22 @@ export default function Dashboard() {
 
   function handleSectionsChanged(showId: string, next: RiderPdfSection[]) {
     setSections(prev => ({ ...prev, [showId]: next }))
+  }
+
+  async function handleImportDates(dates: TourDate[]) {
+    for (const d of dates) {
+      await createShow({
+        artist: d.artist,
+        venue: d.venue,
+        city: `${d.city}${d.country && d.country !== 'US' ? ', ' + d.country : ''}`,
+        date: d.date,
+        buyerName: '',
+        buyerEmail: '',
+        status: 'draft',
+        items: [],
+      })
+    }
+    await load()
   }
 
   const filtered      = shows.filter(s => {
@@ -326,12 +345,18 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => router.push('/riders')}
               className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-all"
             >
               <BookOpen size={15} /> Rider Library
+            </button>
+            <button
+              onClick={() => setShowSyncModal(true)}
+              className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-all"
+            >
+              <RefreshCw size={15} /> Sync Dates
             </button>
             <button
               onClick={() => setShowNewModal(true)}
@@ -410,6 +435,13 @@ export default function Dashboard() {
       </div>
 
       {showNewModal && <NewShowModal onClose={() => setShowNewModal(false)} />}
+      {showSyncModal && (
+        <SyncDatesModal
+          onClose={() => setShowSyncModal(false)}
+          existingShows={shows.map(s => ({ artist: s.artist, date: s.date, venue: s.venue }))}
+          onImport={handleImportDates}
+        />
+      )}
     </div>
   )
 }
