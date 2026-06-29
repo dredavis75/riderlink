@@ -17,11 +17,12 @@ const CATEGORY_EMOJI: Record<string, string> = {
   Other: '📦',
 }
 
+const CACHE_VERSION = 'v4'
 const imageCache = new Map<string, string | null>()
 const pending = new Map<string, Promise<string | null>>()
 
 function resolveImage(name: string, category: string): Promise<string | null> {
-  const key = name.toLowerCase()
+  const key = `${CACHE_VERSION}:${name.toLowerCase()}`
   if (imageCache.has(key)) return Promise.resolve(imageCache.get(key)!)
   if (pending.has(key)) return pending.get(key)!
   const p = fetch(`/api/product-image?v=4&q=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}`)
@@ -44,7 +45,7 @@ export default function ProductImage({ name, category, size = 44 }: Props) {
   const emoji = CATEGORY_EMOJI[category] ?? '📦'
 
   useEffect(() => {
-    const key = name.toLowerCase()
+    const key = `${CACHE_VERSION}:${name.toLowerCase()}`
     if (imageCache.has(key)) { setUrl(imageCache.get(key)!); return }
     resolveImage(name, category).then(setUrl)
   }, [name, category])

@@ -115,13 +115,16 @@ const FOOD_MEAL_QUERIES: [RegExp, string][] = [
   [/\bdessert\b/i,      'dessert'],
 ]
 
-// ── Items that are clearly non-food — show category icon, skip fetch ──────────
+// ── Items with no useful image anywhere — show category icon, skip fetch ──────
+// NOTE: do NOT add items that have local logos (cups, ice, spoon, candle, etc.)
+// The local lookup runs FIRST and returns before this check.
 const SKIP_PATTERNS = [
-  /\bcups?\b/i, /\bice\b/i, /\bnapkin/i, /\bplate/i, /\bfork/i, /\bknife/i,
-  /\bspoon/i, /\btowel/i, /\bsharpie/i, /\bmarker/i, /\blighter/i,
-  /\bcharger/i, /\bextension cord/i, /\bhanger/i, /\bmirror/i,
-  /\bcouch/i, /\bchair/i, /\btable/i, /\brug/i, /\bcandle/i,
+  /\bnapkin/i, /\bfork/i, /\bknife/i, /\bhanger/i, /\bmirror/i,
+  /\bcouch/i, /\bchair/i, /\btable/i, /\brug/i,
   /\bincense/i, /\bhumidifier/i, /\bair freshener/i,
+  /\bextension cord/i, /\bpower strip/i, /\bsurge protect/i,
+  /\bwifi|wi-fi/i, /\bparking/i, /\bhotel\b/i,
+  /security guard|security personnel/i,
 ]
 
 async function fetchCocktailDb(ingredient: string): Promise<string | null> {
