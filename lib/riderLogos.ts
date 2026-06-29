@@ -22,7 +22,7 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/sprite/i,                                      '/rider-logos/SPRITE.jpeg'],
   [/coke|coca.?cola/i,                             '/rider-logos/COKE.jpeg'],
   [/5.?hour energy/i,                              '/rider-logos/5 HOUR ENERGY.jpeg'],
-  [/aloe.?(water|juice|vera|drink)/i,              '/rider-logos/ALOE JUICE.jpeg'],
+  [/aloe\s*(?:water|juice|vera|drink|variety)/i,   '/rider-logos/ALOE JUICE.jpeg'],
   [/ginger beer|ginger ale|ginger juice/i,         '/rider-logos/GINGER.jpeg'],
 
   // Assorted / mixed sodas — handles "Assortment of Sodas", "Assorted Sodas", "Variety of Sodas"
@@ -45,16 +45,16 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/\btea\b/i,                                     '/rider-logos/TEA.jpg'],
 
   // ── Food ───────────────────────────────────────────────────────────────────
-  [/\bpizza\b/i,                                   '/rider-logos/PIZZA.jpg'],
+  [/\bpizzas?\b/i,                                 '/rider-logos/PIZZA.jpg'],
   [/wings?|chicken wings?/i,                       '/rider-logos/WINGS.jpeg'],
-  [/fish (and|&) chicken|fried fish|catfish|tilapia/i, '/rider-logos/FISH AND CHICKEN.jpg'],
+  [/fish (or|and|&) chicken|fried fish|catfish|tilapia|non.vegetarian.*fish|fish.*chicken/i, '/rider-logos/FISH AND CHICKEN.jpg'],
   [/\bfish\b/i,                                    '/rider-logos/FISH AND CHICKEN.jpg'],
   [/rolls? with butter|dinner rolls?|bread rolls?|\brolls?\b/i, '/rider-logos/ROLLS WITH BUTTER.jpg'],
   [/snack platter|snack tray|\bsnacks?\b/i,        '/rider-logos/SNACK PLATTER.jpg'],
-  [/vegetables? and rice|vegg?ies? and rice|rice (and|with) vegg?\w*|\brice\b/i, '/rider-logos/VEGEATBLES AND RICE.jpg'],
+  [/vegetables? and rice|vegg?ies? and rice|side dishes.*rice|rice.*vegg?\w*|\brice\b/i, '/rider-logos/VEGEATBLES AND RICE.jpg'],
   [/condiments?|ketchup|mustard|hot sauce|\bsauces?\b/i, '/rider-logos/CONDIMENTS.jpg'],
-  [/fruit tray|fruit platter|fruit bowl/i,         '/rider-logos/FRUIT TRAY.jpeg'],
-  [/veggie tray|vegetable tray|crudite/i,          '/rider-logos/VEGGIE TRAY.jpeg'],
+  [/fruit tray|fruit platter|fruit bowl|assorted fruit/i, '/rider-logos/FRUIT TRAY.jpeg'],
+  [/veggie tray|vegetable tray|crudite|assorted veggie/i, '/rider-logos/VEGGIE TRAY.jpeg'],
   [/deli tray|cold cuts|charcuterie/i,             '/rider-logos/DELI TRAY.jpeg'],
 
   // Chips & salsa / tortilla chips — use ASSORTED CHIPS
