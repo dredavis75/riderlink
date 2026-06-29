@@ -126,13 +126,21 @@ export default function NewShowModal({ onClose }: Props) {
   }
 
   const addItem = () =>
-    setItems(prev => [...prev, { category: 'Food', name: '', quantity: '', notes: '' }])
+    setItems(prev => [...prev, { category: 'Other', name: '', quantity: '', notes: '' }])
 
   const removeItem = (idx: number) =>
     setItems(prev => prev.filter((_, i) => i !== idx))
 
   const updateItem = (idx: number, field: keyof RiderTemplate, val: string) =>
-    setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: val } : item))
+    setItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item
+      const updated = { ...item, [field]: val }
+      // Auto-detect category when name is typed, unless user already picked one manually
+      if (field === 'name' && (item.category === 'Other' || item.category === '')) {
+        updated.category = detectCategory(val)
+      }
+      return updated
+    }))
 
   const handleCreate = async () => {
     setSaving(true)
@@ -161,7 +169,26 @@ export default function NewShowModal({ onClose }: Props) {
     }
   }
 
-  const CATEGORIES = ['Food', 'Beverages', 'Production', 'Essentials', 'Other']
+  const CATEGORIES = [
+    'Food', 'Beverages', 'Production', 'Security',
+    'Transportation', 'Hotel', 'Venue', 'Dressing Room',
+    'Production Office', 'Dinner', 'Essentials', 'Other',
+  ]
+
+  function detectCategory(name: string): string {
+    const n = name.toLowerCase()
+    if (!n.trim()) return 'Other'
+    if (/water|juice|soda|cola|coke|sprite|lemonade|red bull|energy drink|corona|beer|wine|champagne|p[eé]rignon|tequila|vodka|whiskey|hennessy|casamigos|1942|don julio|clase azul|aloe|cranberry|beverage|liquor/.test(n)) return 'Beverages'
+    if (/wing|pizza|chicken|fruit tray|veggie tray|vegetable|chip|salsa|bread|cookie|snack|sandwich|rice|fish|seafood|peanut butter|jelly|ranch|hot sauce|condiment|roll|entrée|entree|catering|soul food|mango|wings/.test(n)) return 'Food'
+    if (/dinner|meal/.test(n)) return 'Dinner'
+    if (/pioneer|djm|cdj|console|mixer|speaker|monitor|snake|microphone|wireless mic|shure|axient|avid|nexo|acoustics|jbl|amplif|crossover|jdc|cryo|haze|flame|video panel|media server|distro|cable|backline|table with skirting|comms|talk back|cue wedge/.test(n)) return 'Production'
+    if (/security|guard|usher|police|officer/.test(n)) return 'Security'
+    if (/suv|van|sprinter|bus|tour coach|vehicle|driver|limo|transport|flight|airline|delta|ticket|travel|baggage|car/.test(n)) return 'Transportation'
+    if (/hotel|suite|king room|queen room|check.in|check.out|accommodation/.test(n)) return 'Hotel'
+    if (/dressing room|production office|runner|parking|stairway/.test(n)) return 'Venue'
+    if (/towel|sharpie|lighter|charger|ice|cup|plate|napkin|sanitizer|soap|paper towel|purell|bic|iphone charger|lighters/.test(n)) return 'Essentials'
+    return 'Other'
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -349,6 +376,9 @@ export default function NewShowModal({ onClose }: Props) {
                         onChange={e => updateItem(idx, 'category', e.target.value)}
                         className="col-span-3 px-2.5 py-1.5 rounded-lg text-xs border border-gray-200 bg-white focus:outline-none focus:border-gray-400"
                       >
+                        {!CATEGORIES.includes(item.category) && (
+                          <option value={item.category}>{item.category}</option>
+                        )}
                         {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                       </select>
                       <input
