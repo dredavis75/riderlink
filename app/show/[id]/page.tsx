@@ -9,6 +9,7 @@ import {
 import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
 import { getShow, updateItem, sendMessage, subscribeToShow } from '@/lib/db'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
+import ProductImage from '@/app/components/ProductImage'
 
 const ARTIST_COLORS: Record<string, string> = {
   'G Herbo':     'from-emerald-600 to-emerald-800',
@@ -261,6 +262,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                       return (
                         <div key={item.id} className={`px-5 py-4 ${item.status === 'unavailable' ? 'bg-red-50/60' : item.status === 'substituted' ? 'bg-blue-50/60' : ''}`}>
                           <div className="flex items-start justify-between gap-3">
+                            <ProductImage name={item.name} category={item.category} size={40} />
                             <div className="flex-1 min-w-0">
                               {editingItem === item.id ? (
                                 <div className="flex gap-2">

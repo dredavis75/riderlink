@@ -83,9 +83,33 @@ export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages'> &
 
   if (error || !data) throw error
 
-  if (show.items.length > 0) {
+  let itemsToInsert = show.items
+
+  // Auto-populate from master rider if no items provided
+  if (itemsToInsert.length === 0) {
+    const { data: master } = await supabase
+      .from('rider_masters')
+      .select('id, rider_master_items(*)')
+      .eq('artist', show.artist)
+      .single()
+
+    if (master?.rider_master_items?.length) {
+      itemsToInsert = (master.rider_master_items as any[])
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map(i => ({
+          category: i.category,
+          name: i.name,
+          quantity: i.quantity,
+          notes: i.notes ?? '',
+          status: 'pending' as ItemStatus,
+          buyerNote: '',
+        }))
+    }
+  }
+
+  if (itemsToInsert.length > 0) {
     const { error: itemErr } = await supabase.from('rider_items').insert(
-      show.items.map((item, idx) => ({
+      itemsToInsert.map((item, idx) => ({
         show_id: data.id,
         category: item.category,
         name: item.name,

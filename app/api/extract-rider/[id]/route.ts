@@ -148,6 +148,46 @@ export async function POST(
     return NextResponse.json({ error: insertErr.message }, { status: 500 })
   }
 
+  // Save to master rider so future shows auto-populate
+  const artist = show?.artist
+  if (artist) {
+    let masterId: string | null = null
+    const { data: existing } = await sb
+      .from('rider_masters')
+      .select('id')
+      .eq('artist', artist)
+      .single()
+
+    if (existing) {
+      masterId = existing.id
+      await sb.from('rider_master_items').delete().eq('master_id', masterId)
+    } else {
+      const { data: newMaster } = await sb
+        .from('rider_masters')
+        .insert({ artist, version: '1.0' })
+        .select('id')
+        .single()
+      masterId = newMaster?.id ?? null
+    }
+
+    if (masterId) {
+      await sb.from('rider_master_items').insert(
+        allItems.map((item, idx) => ({
+          master_id: masterId,
+          category: item.category,
+          name: item.name,
+          quantity: item.quantity,
+          notes: item.notes,
+          sort_order: idx,
+        }))
+      )
+      // Bump version timestamp
+      await sb.from('rider_masters')
+        .update({ version: '1.0', updated_at: new Date().toISOString() })
+        .eq('id', masterId)
+    }
+  }
+
   return NextResponse.json({
     extracted: allItems.length,
     sections: pdfs.length,
