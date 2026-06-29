@@ -17,7 +17,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   Other: '📦',
 }
 
-const CACHE_VERSION = 'v9'
+const CACHE_VERSION = 'v10'
 const imageCache = new Map<string, string | null>()
 const pending = new Map<string, Promise<string | null>>()
 
@@ -25,7 +25,7 @@ function resolveImage(name: string, category: string): Promise<string | null> {
   const key = `${CACHE_VERSION}:${name.toLowerCase()}`
   if (imageCache.has(key)) return Promise.resolve(imageCache.get(key)!)
   if (pending.has(key)) return pending.get(key)!
-  const p = fetch(`/api/product-image?v=9&q=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}`)
+  const p = fetch(`/api/product-image?v=10&q=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}`)
     .then(r => r.json())
     .then(d => { imageCache.set(key, d.imageUrl ?? null); return d.imageUrl ?? null })
     .catch(() => { imageCache.set(key, null); return null })
@@ -42,6 +42,8 @@ interface Props {
 
 export default function ProductImage({ name, category, size = 64 }: Props) {
   const [url, setUrl] = useState<string | null | undefined>(undefined)
+  // loadKey changes on error to force the browser to retry the img request fresh
+  const [loadKey, setLoadKey] = useState(0)
   const emoji = CATEGORY_EMOJI[category] ?? '📦'
 
   useEffect(() => {
@@ -67,12 +69,20 @@ export default function ProductImage({ name, category, size = 64 }: Props) {
   return (
     <div className="rounded-xl shrink-0 bg-white border border-gray-100 overflow-hidden flex items-center justify-center" style={style}>
       <img
-        src={url}
+        key={loadKey}
+        src={loadKey > 0 ? `${url}?r=${loadKey}` : url}
         alt={name}
         width={size}
         height={size}
         className="object-contain w-full h-full"
-        onError={() => { imageCache.delete(`${CACHE_VERSION}:${name.toLowerCase()}`); setUrl(null) }}
+        onError={() => {
+          if (loadKey < 2) {
+            setLoadKey(k => k + 1)
+          } else {
+            imageCache.set(`${CACHE_VERSION}:${name.toLowerCase()}`, null)
+            setUrl(null)
+          }
+        }}
       />
     </div>
   )
