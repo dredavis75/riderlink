@@ -18,6 +18,20 @@ const CATEGORY_EMOJI: Record<string, string> = {
 }
 
 const imageCache = new Map<string, string | null>()
+const pending = new Map<string, Promise<string | null>>()
+
+function resolveImage(name: string, category: string): Promise<string | null> {
+  const key = name.toLowerCase()
+  if (imageCache.has(key)) return Promise.resolve(imageCache.get(key)!)
+  if (pending.has(key)) return pending.get(key)!
+  const p = fetch(`/api/product-image?q=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}`)
+    .then(r => r.json())
+    .then(d => { imageCache.set(key, d.imageUrl ?? null); return d.imageUrl ?? null })
+    .catch(() => { imageCache.set(key, null); return null })
+    .finally(() => pending.delete(key))
+  pending.set(key, p)
+  return p
+}
 
 interface Props {
   name: string
@@ -25,60 +39,40 @@ interface Props {
   size?: number
 }
 
-export default function ProductImage({ name, category, size = 40 }: Props) {
-  const [imageUrl, setImageUrl] = useState<string | null | undefined>(undefined)
-  const cacheKey = `${category}:${name}`
-
-  useEffect(() => {
-    if (imageCache.has(cacheKey)) {
-      setImageUrl(imageCache.get(cacheKey)!)
-      return
-    }
-    fetch(`/api/product-image?q=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}`)
-      .then(r => r.json())
-      .then(d => {
-        imageCache.set(cacheKey, d.imageUrl)
-        setImageUrl(d.imageUrl)
-      })
-      .catch(() => {
-        imageCache.set(cacheKey, null)
-        setImageUrl(null)
-      })
-  }, [cacheKey, name, category])
-
+export default function ProductImage({ name, category, size = 44 }: Props) {
+  const [url, setUrl] = useState<string | null | undefined>(undefined)
   const emoji = CATEGORY_EMOJI[category] ?? '📦'
 
-  if (imageUrl === undefined) {
-    // Loading state — ghost box
-    return (
-      <div
-        className="rounded-lg bg-gray-100 animate-pulse shrink-0"
-        style={{ width: size, height: size }}
-      />
-    )
+  useEffect(() => {
+    const key = name.toLowerCase()
+    if (imageCache.has(key)) { setUrl(imageCache.get(key)!); return }
+    resolveImage(name, category).then(setUrl)
+  }, [name, category])
+
+  const base = `rounded-xl shrink-0 border border-gray-100`
+  const style = { width: size, height: size }
+
+  if (url === undefined) {
+    return <div className={`${base} bg-gray-100 animate-pulse`} style={style} />
   }
 
-  if (!imageUrl) {
-    // No image — show category emoji
+  if (!url) {
     return (
-      <div
-        className="rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0 text-base"
-        style={{ width: size, height: size }}
-      >
-        {emoji}
+      <div className={`${base} bg-gray-50 flex items-center justify-center`} style={style}>
+        <span style={{ fontSize: size * 0.45 }}>{emoji}</span>
       </div>
     )
   }
 
   return (
     <img
-      src={imageUrl}
+      src={url}
       alt={name}
       width={size}
       height={size}
-      className="rounded-lg object-contain bg-white border border-gray-100 shrink-0"
-      style={{ width: size, height: size }}
-      onError={() => setImageUrl(null)}
+      className={`${base} object-contain bg-white`}
+      style={style}
+      onError={() => setUrl(null)}
     />
   )
 }
