@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Send, Copy, CheckCircle2, AlertCircle,
-  MessageSquare, Edit3, ExternalLink, Loader2, Zap, ShieldCheck,
+  MessageSquare, Edit3, ExternalLink, Loader2, Zap, Download,
 } from 'lucide-react'
-import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
+import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
 import { getShow, updateItem, sendMessage, subscribeToShow } from '@/lib/db'
+import ArtistAvatar from '@/app/components/ArtistAvatar'
 
 const ARTIST_COLORS: Record<string, string> = {
   'G Herbo':     'from-emerald-600 to-emerald-800',
@@ -119,10 +120,13 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
             <ArrowLeft size={15} /> All Shows
           </button>
 
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex items-start gap-4">
+            {/* Artist photo */}
+            <ArtistAvatar artist={show.artist} size={72} rounded="rounded-2xl" className="shadow-xl shadow-black/30 border-2 border-white/20" />
+
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className={`text-xs font-black px-2.5 py-1 rounded-full bg-white/20 text-white`}>{cfg.label.toUpperCase()}</span>
+                <span className="text-xs font-black px-2.5 py-1 rounded-full bg-white/20 text-white">{cfg.label.toUpperCase()}</span>
                 {show.riderVersion && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/70">v{show.riderVersion}</span>}
                 {live && <span className="flex items-center gap-1 text-[10px] text-emerald-300 font-bold uppercase tracking-wider"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />Live</span>}
               </div>
@@ -133,10 +137,25 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
               </p>
               <p className="text-white/40 text-xs mt-1">Buyer: {show.buyerName} · {show.buyerEmail}</p>
             </div>
-            <button onClick={copyLink}
-              className="shrink-0 flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 transition-all">
-              {copied ? <><CheckCircle2 size={14} className="text-emerald-400" /> Copied!</> : <><Copy size={14} /> Copy Buyer Link</>}
-            </button>
+
+            <div className="flex flex-col gap-2 shrink-0">
+              <button onClick={copyLink}
+                className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 transition-all">
+                {copied ? <><CheckCircle2 size={14} className="text-emerald-400" /> Copied!</> : <><Copy size={14} /> Copy Buyer Link</>}
+              </button>
+              {(() => {
+                const artistLower = show.artist.toLowerCase()
+                const pdfKey = Object.keys(OFFICIAL_RIDER_PDFS).find(k =>
+                  k.toLowerCase() === artistLower || artistLower.includes(k.toLowerCase().split(' ').at(-1)!)
+                )
+                return pdfKey ? (
+                  <a href={OFFICIAL_RIDER_PDFS[pdfKey]} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-gray-950 transition-all shadow-lg shadow-amber-500/30">
+                    <Download size={14} /> Official Rider PDF
+                  </a>
+                ) : null
+              })()}
+            </div>
           </div>
 
           {/* Progress bar in header */}

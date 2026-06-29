@@ -11,6 +11,7 @@ import {
 import { MOCK_SHOWS, SHOW_STATUS_CONFIG, type Show } from '@/lib/data'
 import { getShows, subscribeToAllShows } from '@/lib/db'
 import NewShowModal from '@/app/components/NewShowModal'
+import ArtistAvatar from '@/app/components/ArtistAvatar'
 
 const ARTIST_COLORS: Record<string, string> = {
   'G Herbo':     'bg-emerald-500',
@@ -87,8 +88,8 @@ function ShowCard({ show, onClick }: { show: Show; onClick: () => void }) {
 
       {/* Artist + venue */}
       <div className="flex items-start gap-3">
-        <div className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center text-white text-sm font-black shrink-0 shadow-md group-hover:scale-105 transition-transform duration-200`}>
-          {getInitials(show.artist)}
+        <div className="group-hover:scale-105 transition-transform duration-200 shadow-md rounded-xl">
+          <ArtistAvatar artist={show.artist} size={48} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-black text-gray-900 text-lg leading-tight">{show.artist}</div>
