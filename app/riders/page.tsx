@@ -180,7 +180,7 @@ export default function RiderLibrary() {
               <button
                 onClick={handleSeed}
                 disabled={seeding}
-                className="flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-40"
+                className="flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 transition-colors disabled:opacity-40"
               >
                 {seeding ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                 {seeding ? 'Syncing…' : 'Sync from Templates'}
