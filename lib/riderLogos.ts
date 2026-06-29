@@ -9,9 +9,10 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/dom p[eé]rignon|dom p\b/i,                     '/rider-logos/DOM PERIGNON.webp'],
   [/clase azul/i,                                  '/rider-logos/CLASE AZUL.webp'],
   [/casamigos|casa migos/i,                        '/rider-logos/CASA MIGOS.webp'],
+  [/\bcorona\b/i,                                  '/rider-logos/CORONA.webp'],
 
   // Production
-  [/camera|video recorder|camcorder/i,             '/rider-logos/VIDEO CAMERA.jpeg'],
+  [/camera|video recorder|camcorder/i,             '/rider-logos/VIDEO CAMERA.jpg'],
 
   // ── Beverages — branded ────────────────────────────────────────────────────
   [/red bull/i,                                    '/rider-logos/RED BULL.jpeg'],
@@ -28,8 +29,10 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/assort\w* soda|mix\w* soda|variety.* soda|soda.*(variety|assort|mix)/i, '/rider-logos/COKE.jpeg'],
   [/cases? of (soda|pop)|soda cases?/i,            '/rider-logos/COKE.jpeg'],
 
-  // Generic bottled water
-  [/bottled water|case.* water|water.* case|essentia|deer park|fiji|evian|voss/i, '/rider-logos/SMART WATER.jpeg'],
+  // Specific bottled water brands / cases
+  [/essentia/i,                                    '/rider-logos/ESSENTIA BOTTLED WATER.jpg'],
+  [/deer park|case.* water|water.* case/i,         '/rider-logos/CASE OF DEER PARK WATER.webp'],
+  [/bottled water|fiji|evian|voss/i,               '/rider-logos/SMART WATER.jpeg'],
 
   // ── Juices ─────────────────────────────────────────────────────────────────
   [/apple juice/i,                                 '/rider-logos/APPLE JUICE.jpeg'],
@@ -42,6 +45,7 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/\btea\b/i,                                     '/rider-logos/TEA.jpg'],
 
   // ── Food ───────────────────────────────────────────────────────────────────
+  [/\bpizza\b/i,                                   '/rider-logos/CHEESE & PEPPERONI PIZZA 2.jpg'],
   [/wings?|chicken wings?/i,                       '/rider-logos/WINGS.jpeg'],
   [/fruit tray|fruit platter|fruit bowl/i,         '/rider-logos/FRUIT TRAY.jpeg'],
   [/veggie tray|vegetable tray|crudite/i,          '/rider-logos/VEGGIE TRAY.jpeg'],
