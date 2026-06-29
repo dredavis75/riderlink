@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, Download, Zap } from 'lucide-react'
+import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, Download, Zap, Users, X } from 'lucide-react'
 import { MOCK_SHOWS, OFFICIAL_RIDER_PDFS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
 import { getShow, updateItem as dbUpdateItem, sendMessage as dbSendMessage, subscribeToShow, approveRider } from '@/lib/db'
 import { isConfigured } from '@/lib/supabase'
@@ -30,6 +30,76 @@ async function notify(payload: NotifyPayload) {
       body: JSON.stringify(payload),
     })
   } catch {}
+}
+
+function ShareWithTeam({ show }: { show: Show }) {
+  const [open, setOpen]       = useState(false)
+  const [emails, setEmails]   = useState('')
+  const [sending, setSending] = useState(false)
+  const [result, setResult]   = useState<string | null>(null)
+
+  async function send() {
+    const list = emails.split(/[\s,;]+/).map(e => e.trim()).filter(e => e.includes('@'))
+    if (!list.length) { setResult('Enter at least one valid email'); return }
+    setSending(true); setResult(null)
+    try {
+      const res = await fetch('/api/share-rider', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emails: list,
+          showId: show.id,
+          artistName: show.artist,
+          venue: show.venue,
+          city: show.city,
+          date: show.date,
+          senderName: show.buyerName,
+        }),
+      })
+      const data = await res.json()
+      setResult(`✓ Sent to ${data.sent} ${data.sent === 1 ? 'person' : 'people'}`)
+      setEmails('')
+    } catch {
+      setResult('Send failed — try again')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-3.5 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+      >
+        <span className="flex items-center gap-2"><Users size={14} /> Share with Your Team</span>
+        {open ? <X size={14} className="text-gray-400" /> : <span className="text-xs text-gray-400">Add team members →</span>}
+      </button>
+      {open && (
+        <div className="px-5 pb-5 border-t border-gray-100 pt-4 space-y-3">
+          <p className="text-xs text-gray-500">Enter email addresses separated by commas. They'll receive a link to this rider page.</p>
+          <textarea
+            value={emails}
+            onChange={e => setEmails(e.target.value)}
+            placeholder="john@venue.com, sarah@venue.com"
+            rows={2}
+            className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+          />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={send}
+              disabled={sending || !emails.trim()}
+              className="flex items-center gap-2 bg-gray-900 text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-gray-700 disabled:opacity-40 transition-colors"
+            >
+              {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+              Send Access
+            </button>
+            {result && <span className={`text-xs font-semibold ${result.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{result}</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function BuyerPortal({ params }: { params: Promise<{ id: string }> }) {
@@ -220,26 +290,24 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
             </div>
           )}
 
-          {/* Official rider PDF — always accessible from header */}
-          {officialPdfUrl && (
-            <a
-              href={officialPdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-5 flex items-center justify-between gap-4 bg-white/10 hover:bg-white/15 text-white rounded-2xl px-4 py-3 transition-all group border border-white/10"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center shrink-0">
-                  <Download size={16} className="text-gray-950" />
-                </div>
-                <div>
-                  <div className="font-black text-sm">Official Show Rider</div>
-                  <div className="text-xs text-white/50 mt-0.5">{show.artist} · Full rider document · PDF</div>
-                </div>
+          {/* Official rider PDF — merge route handles 1 or many PDFs */}
+          <a
+            href={`/api/merge-rider/${show.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-5 flex items-center justify-between gap-4 bg-white/10 hover:bg-white/15 text-white rounded-2xl px-4 py-3 transition-all group border border-white/10"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center shrink-0">
+                <Download size={16} className="text-gray-950" />
               </div>
-              <span className="text-xs font-bold text-amber-400 shrink-0">Download →</span>
-            </a>
-          )}
+              <div>
+                <div className="font-black text-sm">Download Official Rider</div>
+                <div className="text-xs text-white/50 mt-0.5">{show.artist} · Full rider document · PDF</div>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-amber-400 shrink-0">Download →</span>
+          </a>
         </div>
       </div>
 
@@ -357,6 +425,9 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
                 </div>
               </div>
             </div>
+
+            {/* Share with Team */}
+            <ShareWithTeam show={show} />
 
             {/* Received button */}
             <button

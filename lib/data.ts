@@ -35,6 +35,15 @@ export interface Show {
   riderPdfUrl?: string
 }
 
+export interface RiderPdfSection {
+  id: string
+  showId: string
+  label: string
+  publicUrl: string
+  storagePath: string
+  sortOrder: number
+}
+
 export interface MasterRiderItem {
   id: string
   masterId: string

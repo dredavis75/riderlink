@@ -14,6 +14,7 @@ import {
   updateMasterItem, deleteMasterItem, bumpMasterVersion,
 } from '@/lib/db'
 import { isConfigured } from '@/lib/supabase'
+import ArtistAvatar from '@/app/components/ArtistAvatar'
 
 type LocalItem = { id: string; category: string; name: string; quantity: string; notes: string; sortOrder: number; masterId: string }
 
@@ -227,9 +228,7 @@ export default function RiderLibrary() {
                   className="flex-1 flex items-center gap-3 text-left"
                   onClick={() => !isEditing && setExpanded(isOpen ? null : master.artist)}
                 >
-                  <div className="w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black shrink-0">
-                    {master.artist.split(' ').map(w => w[0]).join('').slice(0, 2)}
-                  </div>
+                  <ArtistAvatar artist={master.artist} size={40} rounded="rounded-full" />
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-black text-gray-900">{master.artist}</span>

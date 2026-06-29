@@ -6,10 +6,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   MapPin, AlertCircle, Bell, Plus, TrendingUp,
-  Loader2, BookOpen, Zap, Music2, Download, FileUp, CheckCircle2,
+  Loader2, BookOpen, Zap, Music2, Download, FileUp, Trash2, Pencil,
 } from 'lucide-react'
-import { MOCK_SHOWS, SHOW_STATUS_CONFIG, type Show } from '@/lib/data'
-import { getShows, subscribeToAllShows } from '@/lib/db'
+import { MOCK_SHOWS, SHOW_STATUS_CONFIG, type Show, type RiderPdfSection } from '@/lib/data'
+import { getShows, subscribeToAllShows, getSectionsForShows, addSection, deleteSection, updateSectionLabel } from '@/lib/db'
 import { supabase, isConfigured } from '@/lib/supabase'
 import NewShowModal from '@/app/components/NewShowModal'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
@@ -34,41 +34,42 @@ function statusCounts(show: Show) {
   return counts
 }
 
-async function uploadRiderPdf(showId: string, file: File): Promise<string> {
+function labelFromFilename(name: string): string {
+  return name
+    .replace(/\.pdf$/i, '')
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .trim() || 'Rider'
+}
+
+async function uploadSectionPdf(showId: string, file: File, sortOrder: number): Promise<RiderPdfSection> {
   if (!file.type.includes('pdf')) throw new Error('Only PDF files are supported')
   if (file.size > 26_214_400) throw new Error('File too large — max 25 MB')
 
   const safeName = file.name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._-]/g, '')
   const path = `${showId}/${Date.now()}-${safeName}`
+  const label = labelFromFilename(file.name)
 
   const { error: upErr } = await supabase.storage
     .from('rider-pdfs')
     .upload(path, file, { contentType: 'application/pdf', upsert: true })
-
   if (upErr) throw new Error(upErr.message)
 
-  const { data: { publicUrl } } = supabase.storage
-    .from('rider-pdfs')
-    .getPublicUrl(path)
+  const { data: { publicUrl } } = supabase.storage.from('rider-pdfs').getPublicUrl(path)
 
-  const { error: dbErr } = await supabase
-    .from('shows')
-    .update({ rider_pdf_url: publicUrl })
-    .eq('id', showId)
-
-  if (dbErr) throw new Error(dbErr.message)
-
-  return publicUrl
+  return addSection(showId, label, publicUrl, path, sortOrder)
 }
 
 function ShowCard({
   show,
+  sections,
   onClick,
-  onPdfAttached,
+  onSectionsChanged,
 }: {
   show: Show
+  sections: RiderPdfSection[]
   onClick: () => void
-  onPdfAttached: (showId: string, url: string) => void
+  onSectionsChanged: (showId: string, sections: RiderPdfSection[]) => void
 }) {
   const counts    = statusCounts(show)
   const hasIssues = counts.unavailable > 0 || counts.substituted > 0
@@ -79,22 +80,27 @@ function ShowCard({
   const total     = show.items.length
   const pct       = total > 0 ? Math.round((counts.confirmed / total) * 100) : 0
 
-  const [dragging, setDragging]   = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [uploadErr, setUploadErr] = useState<string | null>(null)
-  const [pdfUrl, setPdfUrl]       = useState<string | undefined>(show.riderPdfUrl)
+  const [dragging, setDragging]     = useState(false)
+  const [uploading, setUploading]   = useState(false)
+  const [uploadErr, setUploadErr]   = useState<string | null>(null)
+  const [editingId, setEditingId]   = useState<string | null>(null)
+  const [editLabel, setEditLabel]   = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Sync if show prop updates
-  useEffect(() => { setPdfUrl(show.riderPdfUrl) }, [show.riderPdfUrl])
+  const hasSections = sections.length > 0
+  const mergeUrl = `/api/merge-rider/${show.id}`
 
-  async function handleFile(file: File) {
-    setUploading(true)
-    setUploadErr(null)
+  async function handleFiles(files: FileList | File[]) {
+    const arr = Array.from(files).filter(f => f.type.includes('pdf'))
+    if (!arr.length) { setUploadErr('Only PDF files supported'); return }
+    setUploading(true); setUploadErr(null)
     try {
-      const url = await uploadRiderPdf(show.id, file)
-      setPdfUrl(url)
-      onPdfAttached(show.id, url)
+      const newSections: RiderPdfSection[] = []
+      for (const file of arr) {
+        const s = await uploadSectionPdf(show.id, file, sections.length + newSections.length)
+        newSections.push(s)
+      }
+      onSectionsChanged(show.id, [...sections, ...newSections])
     } catch (e: any) {
       setUploadErr(e.message ?? 'Upload failed')
     } finally {
@@ -102,12 +108,16 @@ function ShowCard({
     }
   }
 
-  function onDrop(e: React.DragEvent) {
-    e.preventDefault()
+  async function handleDelete(id: string, e: React.MouseEvent) {
     e.stopPropagation()
-    setDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) handleFile(file)
+    await deleteSection(id)
+    onSectionsChanged(show.id, sections.filter(s => s.id !== id))
+  }
+
+  async function saveLabel(id: string) {
+    await updateSectionLabel(id, editLabel)
+    onSectionsChanged(show.id, sections.map(s => s.id === id ? { ...s, label: editLabel } : s))
+    setEditingId(null)
   }
 
   return (
@@ -117,26 +127,16 @@ function ShowCard({
       onDragOver={e => { e.preventDefault(); setDragging(true) }}
       onDragEnter={e => { e.preventDefault(); setDragging(true) }}
       onDragLeave={() => setDragging(false)}
-      onDrop={onDrop}
+      onDrop={e => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files) }}
     >
-      {/* Main clickable card */}
+      {/* Clickable main area */}
       <button onClick={onClick} className="w-full text-left p-5">
-
-        {/* Status row */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`w-2 h-2 rounded-full shrink-0 ${dot} ${show.status === 'active' ? 'animate-pulse' : ''}`} />
             <span className={`text-xs font-black tracking-wider ${cfg.color}`}>{cfg.label.toUpperCase()}</span>
-            {hasIssues && (
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">
-                ⚠ Attention
-              </span>
-            )}
-            {show.buyerApprovedAt && (
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                ✓ Received
-              </span>
-            )}
+            {hasIssues && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">⚠ Attention</span>}
+            {show.buyerApprovedAt && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Received</span>}
           </div>
           {unread > 0 && (
             <span className="flex items-center gap-1 text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
@@ -145,7 +145,6 @@ function ShowCard({
           )}
         </div>
 
-        {/* Artist + venue */}
         <div className="flex items-start gap-3">
           <div className="group-hover:scale-105 transition-transform duration-200 shadow-md rounded-xl">
             <ArtistAvatar artist={show.artist} size={48} />
@@ -160,7 +159,6 @@ function ShowCard({
           </div>
         </div>
 
-        {/* Progress */}
         {total > 0 && (
           <div className="mt-4 pt-4 border-t border-gray-50">
             <div className="flex items-center justify-between mb-2">
@@ -179,70 +177,80 @@ function ShowCard({
         )}
       </button>
 
-      {/* PDF row — outside the nav button */}
+      {/* PDF sections panel */}
       {isConfigured && (
-        <div className="px-5 pb-4 flex items-center gap-2 border-t border-gray-50 pt-3">
-          {pdfUrl ? (
-            <>
+        <div className="border-t border-gray-50 px-4 pb-4 pt-3 space-y-2">
+          {hasSections && sections.map(s => (
+            <div key={s.id} className="flex items-center gap-2 group/row">
+              {editingId === s.id ? (
+                <input
+                  value={editLabel}
+                  onChange={e => setEditLabel(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveLabel(s.id); if (e.key === 'Escape') setEditingId(null) }}
+                  onBlur={() => saveLabel(s.id)}
+                  autoFocus
+                  className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <a
+                  href={s.publicUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="flex-1 flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:text-amber-900 truncate"
+                >
+                  <Download size={10} className="shrink-0" /> {s.label}
+                </a>
+              )}
+              <button onClick={e => { e.stopPropagation(); setEditingId(s.id); setEditLabel(s.label) }}
+                className="opacity-0 group-hover/row:opacity-100 text-gray-300 hover:text-gray-600 transition-all">
+                <Pencil size={10} />
+              </button>
+              <button onClick={e => handleDelete(s.id, e)}
+                className="opacity-0 group-hover/row:opacity-100 text-gray-300 hover:text-red-500 transition-all">
+                <Trash2 size={10} />
+              </button>
+            </div>
+          ))}
+
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
+              className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg transition-all border border-dashed border-gray-200 hover:border-gray-400"
+            >
+              <FileUp size={10} /> {hasSections ? 'Add PDF' : 'Attach Rider PDF'}
+            </button>
+            {hasSections && (
               <a
-                href={pdfUrl}
+                href={mergeUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={e => e.stopPropagation()}
-                className="flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors"
               >
-                <Download size={11} /> Official Rider PDF
+                <Download size={10} /> Download All
               </a>
-              <button
-                onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
-                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-                title="Replace PDF"
-              >
-                Replace
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
-              className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-all border border-dashed border-gray-200 hover:border-gray-400"
-            >
-              <FileUp size={11} /> Attach Official Rider PDF
-            </button>
-          )}
-          {uploadErr && <span className="text-xs text-red-500 ml-1">{uploadErr}</span>}
+            )}
+            {uploadErr && <span className="text-xs text-red-500">{uploadErr}</span>}
+          </div>
         </div>
       )}
 
-      {/* Hidden file input */}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="application/pdf"
-        className="hidden"
-        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }}
-      />
+      <input ref={fileRef} type="file" accept="application/pdf" multiple className="hidden"
+        onChange={e => { if (e.target.files) handleFiles(e.target.files); e.target.value = '' }} />
 
-      {/* Drag-over overlay */}
       {dragging && (
         <div className="absolute inset-0 bg-amber-500/95 rounded-2xl flex flex-col items-center justify-center gap-2 pointer-events-none">
           <FileUp size={28} className="text-gray-950" />
-          <span className="text-sm font-black text-gray-950">Drop PDF to attach rider</span>
-          <span className="text-xs text-gray-900/60">{show.artist}</span>
+          <span className="text-sm font-black text-gray-950">Drop PDFs to attach</span>
+          <span className="text-xs text-gray-900/60">You can drop multiple at once · {show.artist}</span>
         </div>
       )}
-
-      {/* Upload progress overlay */}
       {uploading && (
         <div className="absolute inset-0 bg-gray-950/80 rounded-2xl flex flex-col items-center justify-center gap-2">
           <Loader2 size={24} className="animate-spin text-amber-400" />
-          <span className="text-sm font-bold text-white">Uploading PDF…</span>
-        </div>
-      )}
-
-      {/* Upload success flash */}
-      {!uploading && pdfUrl && pdfUrl !== show.riderPdfUrl && (
-        <div className="absolute top-3 right-3 bg-emerald-500 text-white text-xs font-black px-2.5 py-1 rounded-full flex items-center gap-1 animate-fade-in">
-          <CheckCircle2 size={11} /> Attached
+          <span className="text-sm font-bold text-white">Uploading…</span>
         </div>
       )}
     </div>
@@ -253,6 +261,7 @@ export default function Dashboard() {
   const router = useRouter()
   const [filter, setFilter]         = useState<'all' | 'active' | 'issues'>('all')
   const [shows, setShows]           = useState<Show[]>(MOCK_SHOWS)
+  const [sections, setSections]     = useState<Record<string, RiderPdfSection[]>>({})
   const [loading, setLoading]       = useState(true)
   const [live, setLive]             = useState(false)
   const [showNewModal, setShowNewModal] = useState(false)
@@ -262,6 +271,10 @@ export default function Dashboard() {
       const data = await getShows()
       setShows(data)
       setLive(true)
+      if (data.length) {
+        const secs = await getSectionsForShows(data.map(s => s.id))
+        setSections(secs)
+      }
     } catch {
       setShows(MOCK_SHOWS)
     } finally {
@@ -275,8 +288,8 @@ export default function Dashboard() {
     return unsub
   }, [load])
 
-  function handlePdfAttached(showId: string, url: string) {
-    setShows(prev => prev.map(s => s.id === showId ? { ...s, riderPdfUrl: url } : s))
+  function handleSectionsChanged(showId: string, next: RiderPdfSection[]) {
+    setSections(prev => ({ ...prev, [showId]: next }))
   }
 
   const filtered      = shows.filter(s => {
@@ -380,8 +393,9 @@ export default function Dashboard() {
             <div key={show.id} style={{ animationDelay: `${i * 60}ms` }}>
               <ShowCard
                 show={show}
+                sections={sections[show.id] ?? []}
                 onClick={() => router.push(`/show/${show.id}`)}
-                onPdfAttached={handlePdfAttached}
+                onSectionsChanged={handleSectionsChanged}
               />
             </div>
           ))}

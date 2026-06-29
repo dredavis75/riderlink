@@ -1,5 +1,5 @@
 import { supabase, isConfigured } from './supabase'
-import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem, RiderTemplate } from './data'
+import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem, RiderTemplate, RiderPdfSection } from './data'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -297,4 +297,66 @@ export function subscribeToAllShows(onUpdate: () => void) {
     .subscribe()
 
   return () => { supabase.removeChannel(channel) }
+}
+
+// ── Rider PDF Sections ────────────────────────────────────────────────────────
+
+function mapSection(row: any): RiderPdfSection {
+  return {
+    id: row.id,
+    showId: row.show_id,
+    label: row.label,
+    publicUrl: row.public_url,
+    storagePath: row.storage_path,
+    sortOrder: row.sort_order,
+  }
+}
+
+export async function getSections(showId: string): Promise<RiderPdfSection[]> {
+  const { data } = await supabase
+    .from('rider_pdf_sections')
+    .select('*')
+    .eq('show_id', showId)
+    .order('sort_order')
+  return (data ?? []).map(mapSection)
+}
+
+export async function getSectionsForShows(showIds: string[]): Promise<Record<string, RiderPdfSection[]>> {
+  if (!showIds.length) return {}
+  const { data } = await supabase
+    .from('rider_pdf_sections')
+    .select('*')
+    .in('show_id', showIds)
+    .order('sort_order')
+  const out: Record<string, RiderPdfSection[]> = {}
+  for (const row of data ?? []) {
+    const s = mapSection(row)
+    if (!out[s.showId]) out[s.showId] = []
+    out[s.showId].push(s)
+  }
+  return out
+}
+
+export async function addSection(
+  showId: string,
+  label: string,
+  publicUrl: string,
+  storagePath: string,
+  sortOrder: number
+): Promise<RiderPdfSection> {
+  const { data, error } = await supabase
+    .from('rider_pdf_sections')
+    .insert({ show_id: showId, label, public_url: publicUrl, storage_path: storagePath, sort_order: sortOrder })
+    .select()
+    .single()
+  if (error) throw error
+  return mapSection(data)
+}
+
+export async function deleteSection(id: string): Promise<void> {
+  await supabase.from('rider_pdf_sections').delete().eq('id', id)
+}
+
+export async function updateSectionLabel(id: string, label: string): Promise<void> {
+  await supabase.from('rider_pdf_sections').update({ label }).eq('id', id)
 }
