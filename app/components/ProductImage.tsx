@@ -55,19 +55,19 @@ export default function ProductImage({ name, category, size = 64 }: Props) {
   const style = { width: size, height: size, minWidth: size, minHeight: size }
 
   if (url === undefined) {
-    return <div className="rounded-xl shrink-0 bg-gray-100 animate-pulse" style={style} />
+    return <div className="rounded-xl shrink-0 bg-gray-800 animate-pulse" style={style} />
   }
 
   if (!url) {
     return (
-      <div className="rounded-xl shrink-0 bg-gray-50 border border-gray-100 flex items-center justify-center" style={style}>
+      <div className="rounded-xl shrink-0 bg-gray-800 border border-gray-700 flex items-center justify-center" style={style}>
         <span style={{ fontSize: size * 0.42 }}>{emoji}</span>
       </div>
     )
   }
 
   return (
-    <div className="rounded-xl shrink-0 bg-white border border-gray-100 overflow-hidden flex items-center justify-center" style={style}>
+    <div className="rounded-xl shrink-0 bg-gray-800 border border-gray-700 overflow-hidden flex items-center justify-center" style={style}>
       <img
         key={loadKey}
         src={loadKey > 0 ? `${url}?r=${loadKey}` : url}

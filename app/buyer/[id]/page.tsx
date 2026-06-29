@@ -258,7 +258,7 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
   })()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-950">
       {/* Header */}
       <div className="relative bg-gray-950 overflow-hidden">
         <div className="absolute inset-0 dot-grid" />
@@ -335,17 +335,17 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
           </div>
         ) : (
           <>
-            <p className="text-sm text-gray-600 bg-white border border-gray-200 rounded-xl px-4 py-3">
+            <p className="text-sm text-gray-400 bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
               Review each item below and mark it confirmed, unavailable, or substituted. When done, approve the full rider at the bottom.
             </p>
 
             {/* Rider items by category */}
             {Object.entries(grouped).map(([category, catItems]) => (
-              <div key={category} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
-                  <h2 className="font-bold text-sm text-gray-700 uppercase tracking-wider">{category}</h2>
+              <div key={category} className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                <div className="px-5 py-3 bg-gray-800 border-b border-gray-700">
+                  <h2 className="font-bold text-sm text-gray-300 uppercase tracking-wider">{category}</h2>
                 </div>
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-gray-800">
                   {catItems.map(item => {
                     const isExpanded = expandedItem === item.id
                     const statusOpt = BUYER_STATUS_OPTIONS.find(o => o.value === item.status) ?? BUYER_STATUS_OPTIONS[3]
@@ -355,7 +355,7 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
                         <div className="flex items-center justify-between gap-3">
                           <ProductImage name={item.name} category={item.category} size={80} />
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-gray-900 text-sm">{item.name}</div>
+                            <div className="font-medium text-white text-sm">{item.name}</div>
                             <div className="text-xs text-gray-400">{item.quantity}{item.notes ? ` · ${item.notes}` : ''}</div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -380,7 +380,7 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
                               placeholder={item.status === 'substituted' ? 'What can you substitute?' : 'Add a note for the tour manager…'}
                               value={item.buyerNote}
                               onChange={e => handleNoteChange(item, e.target.value)}
-                              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                              className="w-full text-sm bg-gray-800 border border-gray-700 text-white placeholder-gray-600 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500"
                             />
                           </div>
                         )}
@@ -392,16 +392,16 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
             ))}
 
             {/* Message thread */}
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-              <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
-                <h2 className="font-bold text-sm text-gray-700 uppercase tracking-wider">Message Tour Manager</h2>
+            <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+              <div className="px-5 py-3 bg-gray-800 border-b border-gray-700">
+                <h2 className="font-bold text-sm text-gray-300 uppercase tracking-wider">Message Tour Manager</h2>
               </div>
               <div className="p-4">
                 {messages.length > 0 && (
                   <div className="mb-3 space-y-2 max-h-48 overflow-y-auto">
                     {messages.map(msg => (
                       <div key={msg.id} className={`flex ${msg.from === 'buyer' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xs rounded-2xl px-3 py-2 text-sm ${msg.from === 'buyer' ? 'bg-gray-900 text-white rounded-br-sm' : 'bg-gray-100 text-gray-900 rounded-bl-sm'}`}>
+                        <div className={`max-w-xs rounded-2xl px-3 py-2 text-sm ${msg.from === 'buyer' ? 'bg-amber-500/20 text-white border border-amber-500/30 rounded-br-sm' : 'bg-gray-800 text-white rounded-bl-sm'}`}>
                           <div className="text-xs opacity-60 font-semibold mb-0.5">{msg.sender}</div>
                           {msg.text}
                         </div>
@@ -415,12 +415,12 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
                     onChange={e => setNewMessage(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                     placeholder="Send a message…"
-                    className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    className="flex-1 text-sm bg-gray-800 border border-gray-700 text-white placeholder-gray-600 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                   <button
                     onClick={sendMessage}
                     disabled={sending || !newMessage.trim()}
-                    className="bg-gray-900 text-white px-4 py-2.5 rounded-xl hover:bg-gray-700 transition-colors disabled:opacity-40"
+                    className="bg-amber-500 hover:bg-amber-400 text-gray-950 px-4 py-2.5 rounded-xl transition-colors disabled:opacity-40"
                   >
                     {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                   </button>
@@ -435,7 +435,7 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
             <button
               onClick={handleApprove}
               disabled={approving}
-              className="w-full bg-gray-900 text-white font-black py-4 rounded-2xl hover:bg-gray-700 transition-colors text-sm tracking-wide disabled:opacity-40 flex items-center justify-center gap-2"
+              className="w-full bg-amber-500 hover:bg-amber-400 text-gray-950 font-black py-4 rounded-2xl transition-colors text-sm tracking-wide disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25"
             >
               {approving
                 ? <><Loader2 size={15} className="animate-spin" /> Confirming…</>

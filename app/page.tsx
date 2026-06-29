@@ -124,8 +124,8 @@ function ShowCard({
 
   return (
     <div
-      className={`relative group bg-white rounded-2xl border border-gray-100 border-l-4 ${border} overflow-hidden transition-all duration-200 animate-slide-up
-        ${dragging ? 'ring-2 ring-amber-500 ring-offset-2 scale-[1.02] shadow-2xl' : 'hover:shadow-xl hover:-translate-y-0.5'}`}
+      className={`relative group bg-gray-900 rounded-2xl border border-gray-800 border-l-4 ${border} overflow-hidden transition-all duration-200 animate-slide-up
+        ${dragging ? 'ring-2 ring-amber-500 ring-offset-2 ring-offset-gray-950 scale-[1.02] shadow-2xl' : 'hover:shadow-xl hover:shadow-black/40 hover:-translate-y-0.5'}`}
       onDragOver={e => { e.preventDefault(); setDragging(true) }}
       onDragEnter={e => { e.preventDefault(); setDragging(true) }}
       onDragLeave={() => setDragging(false)}
@@ -137,11 +137,11 @@ function ShowCard({
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`w-2 h-2 rounded-full shrink-0 ${dot} ${show.status === 'active' ? 'animate-pulse' : ''}`} />
             <span className={`text-xs font-black tracking-wider ${cfg.color}`}>{cfg.label.toUpperCase()}</span>
-            {hasIssues && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">⚠ Attention</span>}
-            {show.buyerApprovedAt && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Received</span>}
+            {hasIssues && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 border border-red-800">⚠ Attention</span>}
+            {show.buyerApprovedAt && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-800">✓ Received</span>}
           </div>
           {unread > 0 && (
-            <span className="flex items-center gap-1 text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
+            <span className="flex items-center gap-1 text-xs font-black text-blue-400 bg-blue-900/40 px-2.5 py-1 rounded-full border border-blue-800">
               <Bell size={10} /> {unread} new
             </span>
           )}
@@ -152,9 +152,9 @@ function ShowCard({
             <ArtistAvatar artist={show.artist} size={48} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-black text-gray-900 text-lg leading-tight">{show.artist}</div>
-            <div className="text-sm text-gray-500 truncate mt-0.5">{show.venue}</div>
-            <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+            <div className="font-black text-white text-lg leading-tight">{show.artist}</div>
+            <div className="text-sm text-gray-400 truncate mt-0.5">{show.venue}</div>
+            <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
               <MapPin size={10} />
               {show.city} · {new Date(show.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </div>
@@ -162,17 +162,17 @@ function ShowCard({
         </div>
 
         {total > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-50">
+          <div className="mt-4 pt-4 border-t border-gray-800">
             <div className="flex items-center justify-between mb-2">
               <div className="flex gap-3 text-xs font-semibold">
-                {counts.confirmed   > 0 && <span className="text-emerald-600">✓ {counts.confirmed}</span>}
-                {counts.pending     > 0 && <span className="text-amber-500">◷ {counts.pending}</span>}
-                {counts.unavailable > 0 && <span className="text-red-500">✕ {counts.unavailable}</span>}
-                {counts.substituted > 0 && <span className="text-blue-500">⇄ {counts.substituted}</span>}
+                {counts.confirmed   > 0 && <span className="text-emerald-400">✓ {counts.confirmed}</span>}
+                {counts.pending     > 0 && <span className="text-amber-400">◷ {counts.pending}</span>}
+                {counts.unavailable > 0 && <span className="text-red-400">✕ {counts.unavailable}</span>}
+                {counts.substituted > 0 && <span className="text-blue-400">⇄ {counts.substituted}</span>}
               </div>
-              <span className="text-xs font-black text-gray-400">{pct}%</span>
+              <span className="text-xs font-black text-gray-500">{pct}%</span>
             </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
               <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full fill-bar" style={{ width: `${pct}%` }} />
             </div>
           </div>
@@ -181,7 +181,7 @@ function ShowCard({
 
       {/* PDF sections panel */}
       {isConfigured && (
-        <div className="border-t border-gray-50 px-4 pb-4 pt-3 space-y-2">
+        <div className="border-t border-gray-800 px-4 pb-4 pt-3 space-y-2">
           {hasSections && sections.map(s => (
             <div key={s.id} className="flex items-center gap-2 group/row">
               {editingId === s.id ? (
@@ -191,7 +191,7 @@ function ShowCard({
                   onKeyDown={e => { if (e.key === 'Enter') saveLabel(s.id); if (e.key === 'Escape') setEditingId(null) }}
                   onBlur={() => saveLabel(s.id)}
                   autoFocus
-                  className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="flex-1 text-xs bg-gray-800 border border-gray-700 text-white rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   onClick={e => e.stopPropagation()}
                 />
               ) : (
@@ -200,7 +200,7 @@ function ShowCard({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={e => e.stopPropagation()}
-                  className="flex-1 flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:text-amber-900 truncate"
+                  className="flex-1 flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 truncate"
                 >
                   <Download size={10} className="shrink-0" /> {s.label}
                 </a>
@@ -219,7 +219,7 @@ function ShowCard({
           <div className="flex items-center gap-2 pt-1">
             <button
               onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
-              className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg transition-all border border-dashed border-gray-200 hover:border-gray-400"
+              className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-white hover:bg-gray-800 px-2.5 py-1.5 rounded-lg transition-all border border-dashed border-gray-700 hover:border-gray-500"
             >
               <FileUp size={10} /> {hasSections ? 'Add PDF' : 'Attach Rider PDF'}
             </button>
@@ -229,7 +229,7 @@ function ShowCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={e => e.stopPropagation()}
-                className="flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-900/30 hover:bg-amber-900/50 border border-amber-800 px-2.5 py-1.5 rounded-lg transition-colors"
               >
                 <Download size={10} /> Download All
               </a>
@@ -321,7 +321,7 @@ export default function Dashboard() {
   const totalMessages = shows.flatMap(s => s.messages).filter(m => m.from === 'buyer').length
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-950">
       {/* ── Header ── */}
       <header className="relative bg-gray-950 overflow-hidden">
         <div className="absolute inset-0 dot-grid" />
@@ -371,26 +371,26 @@ export default function Dashboard() {
       <div className="max-w-5xl mx-auto px-5 py-8">
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-amber-500 p-5 shadow-sm">
+          <div className="bg-gray-900 rounded-2xl border border-gray-800 border-l-4 border-l-amber-500 p-5">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={13} className="text-amber-500" />
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Shows</span>
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Active Shows</span>
             </div>
-            <div className="text-4xl font-black text-gray-900">{loading ? '—' : activeShows}</div>
+            <div className="text-4xl font-black text-white">{loading ? '—' : activeShows}</div>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-red-500 p-5 shadow-sm">
+          <div className="bg-gray-900 rounded-2xl border border-gray-800 border-l-4 border-l-red-500 p-5">
             <div className="flex items-center gap-2 mb-2">
               <AlertCircle size={13} className="text-red-500" />
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Needs Attention</span>
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Needs Attention</span>
             </div>
-            <div className={`text-4xl font-black ${totalIssues > 0 ? 'text-red-500' : 'text-gray-900'}`}>{loading ? '—' : totalIssues}</div>
+            <div className={`text-4xl font-black ${totalIssues > 0 ? 'text-red-400' : 'text-white'}`}>{loading ? '—' : totalIssues}</div>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-blue-500 p-5 shadow-sm">
+          <div className="bg-gray-900 rounded-2xl border border-gray-800 border-l-4 border-l-blue-500 p-5">
             <div className="flex items-center gap-2 mb-2">
               <Bell size={13} className="text-blue-500" />
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Buyer Messages</span>
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Buyer Messages</span>
             </div>
-            <div className={`text-4xl font-black ${totalMessages > 0 ? 'text-blue-500' : 'text-gray-900'}`}>{loading ? '—' : totalMessages}</div>
+            <div className={`text-4xl font-black ${totalMessages > 0 ? 'text-blue-400' : 'text-white'}`}>{loading ? '—' : totalMessages}</div>
           </div>
         </div>
 
@@ -400,8 +400,8 @@ export default function Dashboard() {
             <button key={f} onClick={() => setFilter(f)}
               className={`text-sm font-black px-4 py-2 rounded-xl transition-all ${
                 filter === f
-                  ? 'bg-gray-900 text-white shadow-sm'
-                  : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-800'
+                  ? 'bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20'
+                  : 'bg-gray-900 border border-gray-800 text-gray-400 hover:border-gray-600 hover:text-white'
               }`}>
               {f === 'all' ? 'All Shows' : f === 'active' ? '⚡ Active' : '⚠ Attention'}
             </button>

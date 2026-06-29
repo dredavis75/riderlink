@@ -16,23 +16,24 @@ const ARTIST_COLORS: Record<string, string> = {
   'SKRILLA':     'from-violet-600 to-violet-800',
   'Keyshia Cole':'from-rose-600 to-rose-800',
   'Flo Milli':   'from-amber-500 to-amber-700',
+  'Tink':        'from-pink-600 to-pink-800',
   'K. Michelle': 'from-teal-600 to-teal-800',
   'RL':          'from-blue-600 to-blue-800',
   'NEXT':        'from-sky-500 to-sky-700',
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  'Dressing Room':    'border-l-rose-400 bg-rose-50/40',
-  'Production Office':'border-l-orange-400 bg-orange-50/40',
-  'Dinner':           'border-l-amber-400 bg-amber-50/40',
-  'Production':       'border-l-violet-400 bg-violet-50/40',
-  'Security':         'border-l-red-400 bg-red-50/40',
-  'Venue':            'border-l-blue-400 bg-blue-50/40',
-  'Transportation':   'border-l-cyan-400 bg-cyan-50/40',
-  'Hotel':            'border-l-teal-400 bg-teal-50/40',
-  'Food':             'border-l-green-400 bg-green-50/40',
-  'Beverages':        'border-l-amber-400 bg-amber-50/40',
-  'Essentials':       'border-l-gray-400 bg-gray-50/40',
+  'Dressing Room':    'border-l-rose-400 bg-rose-900/10',
+  'Production Office':'border-l-orange-400 bg-orange-900/10',
+  'Dinner':           'border-l-amber-400 bg-amber-900/10',
+  'Production':       'border-l-violet-400 bg-violet-900/10',
+  'Security':         'border-l-red-400 bg-red-900/10',
+  'Venue':            'border-l-blue-400 bg-blue-900/10',
+  'Transportation':   'border-l-cyan-400 bg-cyan-900/10',
+  'Hotel':            'border-l-teal-400 bg-teal-900/10',
+  'Food':             'border-l-green-400 bg-green-900/10',
+  'Beverages':        'border-l-amber-400 bg-amber-900/10',
+  'Essentials':       'border-l-gray-400 bg-gray-800/40',
 }
 
 function groupByCategory(items: RiderItem[]) {
@@ -129,7 +130,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-950">
       {/* ── Hero header ── */}
       <div className={`bg-gradient-to-br ${gradient} relative overflow-hidden`}>
         <div className="absolute inset-0 dot-grid" />
@@ -197,7 +198,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
       <div className="max-w-4xl mx-auto px-5 py-6">
         {/* Approval banner */}
         {show.buyerApprovedAt && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2 text-sm text-emerald-700 font-semibold animate-fade-in">
+          <div className="bg-emerald-900/30 border border-emerald-800 rounded-xl px-4 py-3 mb-4 flex items-center gap-2 text-sm text-emerald-400 font-semibold animate-fade-in">
             <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
             Rider received by <strong>{show.buyerApprovedName}</strong>
             {' · '}
@@ -208,7 +209,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
         )}
 
         {issueCount > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2 text-sm text-red-700 font-semibold">
+          <div className="bg-red-900/30 border border-red-800 rounded-xl px-4 py-3 mb-4 flex items-center gap-2 text-sm text-red-400 font-semibold">
             <AlertCircle size={15} />
             {issueCount} item{issueCount > 1 ? 's' : ''} flagged — review below
           </div>
@@ -217,11 +218,11 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
         {/* Tabs */}
         <div className="flex gap-2 mb-6 items-center flex-wrap">
           <button onClick={() => setActiveTab('rider')}
-            className={`text-sm font-black px-4 py-2 rounded-xl transition-all ${activeTab === 'rider' ? 'bg-gray-900 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400'}`}>
+            className={`text-sm font-black px-4 py-2 rounded-xl transition-all ${activeTab === 'rider' ? 'bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:border-gray-600 hover:text-white'}`}>
             Rider Items
           </button>
           <button onClick={() => setActiveTab('messages')}
-            className={`flex items-center gap-2 text-sm font-black px-4 py-2 rounded-xl transition-all ${activeTab === 'messages' ? 'bg-gray-900 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400'}`}>
+            className={`flex items-center gap-2 text-sm font-black px-4 py-2 rounded-xl transition-all ${activeTab === 'messages' ? 'bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:border-gray-600 hover:text-white'}`}>
             <MessageSquare size={13} /> Messages
             {unreadBuyer > 0 && <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-black">{unreadBuyer}</span>}
           </button>
@@ -234,13 +235,13 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
           </button>
 
           {extractResult && (
-            <span className={`text-xs font-bold ${extractResult.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>
+            <span className={`text-xs font-bold ${extractResult.startsWith('✓') ? 'text-emerald-400' : 'text-red-400'}`}>
               {extractResult}
             </span>
           )}
 
           <a href={`/buyer/${show.id}`} target="_blank"
-            className="ml-auto flex items-center gap-1.5 text-sm font-semibold text-gray-400 hover:text-gray-700 transition-colors">
+            className="ml-auto flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-white transition-colors">
             <ExternalLink size={13} /> Buyer view
           </a>
         </div>
@@ -251,16 +252,16 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
             {Object.entries(grouped).map(([category, catItems]) => {
               const catStyle = CATEGORY_COLORS[category] ?? 'border-l-gray-300 bg-white'
               return (
-                <div key={category} className={`rounded-2xl border border-gray-100 border-l-4 overflow-hidden ${catStyle}`}>
-                  <div className="px-5 py-3 border-b border-gray-100/80 flex items-center justify-between">
-                    <h2 className="font-black text-xs text-gray-700 uppercase tracking-widest">{category}</h2>
-                    <span className="text-xs font-bold text-gray-400">{catItems.length} items</span>
+                <div key={category} className={`rounded-2xl border border-gray-800 border-l-4 overflow-hidden ${catStyle}`}>
+                  <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
+                    <h2 className="font-black text-xs text-gray-300 uppercase tracking-widest">{category}</h2>
+                    <span className="text-xs font-bold text-gray-500">{catItems.length} items</span>
                   </div>
-                  <div className="divide-y divide-gray-100/80">
+                  <div className="divide-y divide-gray-800">
                     {catItems.map(item => {
                       const sCfg = STATUS_CONFIG[item.status]
                       return (
-                        <div key={item.id} className={`px-5 py-4 ${item.status === 'unavailable' ? 'bg-red-50/60' : item.status === 'substituted' ? 'bg-blue-50/60' : ''}`}>
+                        <div key={item.id} className={`px-5 py-4 ${item.status === 'unavailable' ? 'bg-red-900/20' : item.status === 'substituted' ? 'bg-blue-900/20' : ''}`}>
                           <div className="flex items-start justify-between gap-3">
                             <ProductImage name={item.name} category={item.category} size={80} />
                             <div className="flex-1 min-w-0">
@@ -268,21 +269,21 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                                 <div className="flex gap-2">
                                   <input value={editValue} onChange={e => setEditValue(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && saveEdit(item.id)}
-                                    className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900" autoFocus />
+                                    className="flex-1 text-sm bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" autoFocus />
                                   <button onClick={() => saveEdit(item.id)} className="text-sm font-bold text-emerald-600">Save</button>
                                   <button onClick={() => setEditingItem(null)} className="text-sm text-gray-400">Cancel</button>
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-gray-900 text-sm">{item.name}</span>
-                                  <button onClick={() => { setEditingItem(item.id); setEditValue(item.name) }} className="text-gray-300 hover:text-gray-600 transition-colors">
+                                  <span className="font-semibold text-white text-sm">{item.name}</span>
+                                  <button onClick={() => { setEditingItem(item.id); setEditValue(item.name) }} className="text-gray-600 hover:text-gray-300 transition-colors">
                                     <Edit3 size={11} />
                                   </button>
                                 </div>
                               )}
                               <span className="text-xs text-gray-400">{item.quantity}{item.notes ? ` · ${item.notes}` : ''}</span>
                               {item.buyerNote && (
-                                <div className="mt-2 text-xs bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-blue-700">
+                                <div className="mt-2 text-xs bg-blue-900/30 border border-blue-800 rounded-lg px-3 py-2 text-blue-300">
                                   <span className="font-bold">Buyer:</span> {item.buyerNote}
                                 </div>
                               )}
@@ -310,17 +311,17 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
 
         {/* ── Messages tab ── */}
         {activeTab === 'messages' && (
-          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col animate-slide-up">
+          <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden flex flex-col animate-slide-up">
             <div className="p-5 space-y-3 overflow-y-auto" style={{ minHeight: 300, maxHeight: 420 }}>
               {show.messages.length === 0 && (
-                <div className="text-center text-gray-400 text-sm pt-12">
+                <div className="text-center text-gray-500 text-sm pt-12">
                   <MessageSquare size={24} className="mx-auto mb-2 opacity-30" />
                   No messages yet. Send the buyer link to start.
                 </div>
               )}
               {show.messages.map(msg => (
                 <div key={msg.id} className={`flex ${msg.from === 'manager' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-xs rounded-2xl px-4 py-2.5 text-sm ${msg.from === 'manager' ? 'bg-gray-900 text-white rounded-br-sm' : 'bg-gray-100 text-gray-900 rounded-bl-sm'}`}>
+                  <div className={`max-w-xs rounded-2xl px-4 py-2.5 text-sm ${msg.from === 'manager' ? 'bg-amber-500/20 text-white border border-amber-500/30 rounded-br-sm' : 'bg-gray-800 text-white rounded-bl-sm'}`}>
                     <div className="font-black text-xs mb-1 opacity-50">{msg.sender}</div>
                     {msg.text}
                     <div className="text-xs mt-1 opacity-30">{new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
@@ -328,12 +329,12 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                 </div>
               ))}
             </div>
-            <div className="border-t border-gray-100 p-4 flex gap-3">
+            <div className="border-t border-gray-800 p-4 flex gap-3">
               <input value={newMessage} onChange={e => setNewMessage(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
                 placeholder="Message the buyer…"
-                className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-900" />
-              <button onClick={handleSendMessage} className="bg-gray-900 text-white px-4 py-2.5 rounded-xl hover:bg-gray-700 transition-colors">
+                className="flex-1 text-sm bg-gray-800 border border-gray-700 text-white placeholder-gray-600 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+              <button onClick={handleSendMessage} className="bg-amber-500 hover:bg-amber-400 text-gray-950 px-4 py-2.5 rounded-xl transition-colors">
                 <Send size={15} />
               </button>
             </div>

@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #030712;
+  --foreground: #f9fafb;
 }
 
 @theme inline {
@@ -19,7 +19,7 @@ body {
 }
 
 input, textarea, select {
-  color: #111827;
+  color: #f9fafb;
 }
 
 @keyframes slide-up {
