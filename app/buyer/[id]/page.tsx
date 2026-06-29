@@ -176,11 +176,13 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
   const total = items.length
   const pct = total > 0 ? Math.round((confirmed / total) * 100) : 0
 
-  // Case-insensitive lookup so "G Herbo" / "g herbo" both match
+  // Match artist name loosely (case-insensitive, partial) so typos/variants still work
   const officialPdfUrl = (() => {
-    const key = Object.keys(OFFICIAL_RIDER_PDFS).find(
-      k => k.toLowerCase() === (show.artist ?? '').toLowerCase()
-    )
+    const artistLower = (show.artist ?? '').toLowerCase()
+    const key = Object.keys(OFFICIAL_RIDER_PDFS).find(k => {
+      const kl = k.toLowerCase()
+      return kl === artistLower || artistLower.includes(kl) || kl.includes(artistLower)
+    })
     return key ? OFFICIAL_RIDER_PDFS[key] : null
   })()
 
@@ -217,31 +219,31 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
               </div>
             </div>
           )}
+
+          {/* Official rider PDF — always accessible from header */}
+          {officialPdfUrl && (
+            <a
+              href={officialPdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-5 flex items-center justify-between gap-4 bg-white/10 hover:bg-white/15 text-white rounded-2xl px-4 py-3 transition-all group border border-white/10"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center shrink-0">
+                  <Download size={16} className="text-gray-950" />
+                </div>
+                <div>
+                  <div className="font-black text-sm">Official Show Rider</div>
+                  <div className="text-xs text-white/50 mt-0.5">{show.artist} · Full rider document · PDF</div>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-amber-400 shrink-0">Download →</span>
+            </a>
+          )}
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-5 py-6 space-y-6">
-
-        {/* Official rider PDF download */}
-        {officialPdfUrl && (
-          <a
-            href={officialPdfUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-between gap-4 bg-gray-900 hover:bg-gray-800 text-white rounded-2xl px-5 py-4 transition-all group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shrink-0 shadow-md shadow-amber-500/30">
-                <Download size={18} className="text-gray-950" />
-              </div>
-              <div>
-                <div className="font-black text-sm">Official Show Rider</div>
-                <div className="text-xs text-gray-400 mt-0.5">{show.artist} · Full rider document · PDF</div>
-              </div>
-            </div>
-            <span className="text-xs font-bold text-amber-500 group-hover:text-amber-400 transition-colors shrink-0">Download →</span>
-          </a>
-        )}
 
         {/* Already received — confirmation state */}
         {approved ? (
