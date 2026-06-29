@@ -18,7 +18,8 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
 
   // ── Transportation ─────────────────────────────────────────────────────────
   [/airfare|round.trip air|airplane|airline/i,     '/rider-logos/AIRPLANE.jpg'],
-  [/black suv|suv.*van|sprinter van|runner.*suv|clean suv|\brunner\b/i, '/rider-logos/RUNNER VEHICLE.jpg'],
+  [/\brunner\b/i,                                  '/rider-logos/RUNNER VEHICLE.jpg'],
+  [/black suv|suv.*van|sprinter van|clean suv/i,   '/rider-logos/BLACK SUV.jpg'],
   [/baggage|luggage|suitcase/i,                    '/rider-logos/BAGGAGE OR SUITCASE.png'],
 
   // ── Hotel ──────────────────────────────────────────────────────────────────
