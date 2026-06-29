@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Send, Copy, CheckCircle2, AlertCircle,
-  MessageSquare, Edit3, ExternalLink, Loader2, Zap, Download,
+  MessageSquare, Edit3, ExternalLink, Loader2, Zap, Download, Sparkles,
 } from 'lucide-react'
 import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
 import { getShow, updateItem, sendMessage, subscribeToShow } from '@/lib/db'
@@ -46,14 +46,16 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const { id } = use(params)
   const router  = useRouter()
 
-  const [show, setShow]             = useState<Show | null>(MOCK_SHOWS.find(s => s.id === id) ?? null)
-  const [saving, setSaving]         = useState<string | null>(null)
-  const [newMessage, setNewMessage] = useState('')
+  const [show, setShow]               = useState<Show | null>(MOCK_SHOWS.find(s => s.id === id) ?? null)
+  const [saving, setSaving]           = useState<string | null>(null)
+  const [newMessage, setNewMessage]   = useState('')
   const [editingItem, setEditingItem] = useState<string | null>(null)
-  const [editValue, setEditValue]   = useState('')
-  const [copied, setCopied]         = useState(false)
-  const [activeTab, setActiveTab]   = useState<'rider' | 'messages'>('rider')
-  const [live, setLive]             = useState(false)
+  const [editValue, setEditValue]     = useState('')
+  const [copied, setCopied]           = useState(false)
+  const [activeTab, setActiveTab]     = useState<'rider' | 'messages'>('rider')
+  const [live, setLive]               = useState(false)
+  const [extracting, setExtracting]   = useState(false)
+  const [extractResult, setExtractResult] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -106,6 +108,23 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
     navigator.clipboard.writeText(buyerLink)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function extractFromPdfs() {
+    if (!confirm('This will read your uploaded PDFs and replace the current rider items with everything extracted. Continue?')) return
+    setExtracting(true)
+    setExtractResult(null)
+    try {
+      const res = await fetch(`/api/extract-rider/${id}`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Extraction failed')
+      setExtractResult(`✓ Extracted ${data.extracted} items from ${data.sections} PDF${data.sections !== 1 ? 's' : ''}`)
+      await load() // reload show to get new items
+    } catch (e: any) {
+      setExtractResult(`✕ ${e.message}`)
+    } finally {
+      setExtracting(false)
+    }
   }
 
   return (
@@ -195,7 +214,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
         )}
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 items-center">
+        <div className="flex gap-2 mb-6 items-center flex-wrap">
           <button onClick={() => setActiveTab('rider')}
             className={`text-sm font-black px-4 py-2 rounded-xl transition-all ${activeTab === 'rider' ? 'bg-gray-900 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400'}`}>
             Rider Items
@@ -205,6 +224,20 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
             <MessageSquare size={13} /> Messages
             {unreadBuyer > 0 && <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-black">{unreadBuyer}</span>}
           </button>
+
+          <button onClick={extractFromPdfs} disabled={extracting}
+            className="flex items-center gap-2 text-sm font-black px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white transition-all shadow-sm shadow-violet-500/30 disabled:opacity-50">
+            {extracting
+              ? <><Loader2 size={13} className="animate-spin" /> Reading PDFs…</>
+              : <><Sparkles size={13} /> Extract Rider Items</>}
+          </button>
+
+          {extractResult && (
+            <span className={`text-xs font-bold ${extractResult.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>
+              {extractResult}
+            </span>
+          )}
+
           <a href={`/buyer/${show.id}`} target="_blank"
             className="ml-auto flex items-center gap-1.5 text-sm font-semibold text-gray-400 hover:text-gray-700 transition-colors">
             <ExternalLink size={13} /> Buyer view
