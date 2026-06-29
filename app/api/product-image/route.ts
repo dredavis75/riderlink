@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { lookupLocalLogo } from '@/lib/riderLogos'
 
 export const maxDuration = 15
 
@@ -199,6 +200,13 @@ export async function GET(req: NextRequest) {
   }
 
   let imageUrl: string | null = null
+
+  // 0. Local rider logos folder — always first, instant, no API call
+  const local = lookupLocalLogo(name)
+  if (local) {
+    cache.set(cacheKey, { url: local, ts: Date.now() })
+    return NextResponse.json({ imageUrl: local }, { headers: { 'Cache-Control': 'public, max-age=86400' } })
+  }
 
   // 1. Skip non-visual items immediately
   if (SKIP_PATTERNS.some(p => p.test(name))) {
