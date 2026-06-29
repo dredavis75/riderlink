@@ -16,6 +16,7 @@ function mapShow(row: any): Show {
     buyerApprovedAt: row.buyer_approved_at ?? undefined,
     buyerApprovedName: row.buyer_approved_name ?? undefined,
     riderVersion: row.rider_version ?? undefined,
+    riderPdfUrl: row.rider_pdf_url ?? undefined,
     items: (row.rider_items ?? [])
       .sort((a: any, b: any) => a.sort_order - b.sort_order)
       .map((i: any): RiderItem => ({

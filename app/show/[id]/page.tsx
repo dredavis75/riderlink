@@ -144,12 +144,13 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                 {copied ? <><CheckCircle2 size={14} className="text-emerald-400" /> Copied!</> : <><Copy size={14} /> Copy Buyer Link</>}
               </button>
               {(() => {
-                const artistLower = show.artist.toLowerCase()
-                const pdfKey = Object.keys(OFFICIAL_RIDER_PDFS).find(k =>
-                  k.toLowerCase() === artistLower || artistLower.includes(k.toLowerCase().split(' ').at(-1)!)
-                )
-                return pdfKey ? (
-                  <a href={OFFICIAL_RIDER_PDFS[pdfKey]} target="_blank" rel="noopener noreferrer"
+                const url = show.riderPdfUrl ?? (() => {
+                  const al = show.artist.toLowerCase()
+                  const k = Object.keys(OFFICIAL_RIDER_PDFS).find(k => k.toLowerCase() === al || al.includes(k.toLowerCase().split(' ').at(-1)!))
+                  return k ? OFFICIAL_RIDER_PDFS[k] : null
+                })()
+                return url ? (
+                  <a href={url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-gray-950 transition-all shadow-lg shadow-amber-500/30">
                     <Download size={14} /> Official Rider PDF
                   </a>

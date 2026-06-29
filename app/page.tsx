@@ -2,26 +2,17 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   MapPin, AlertCircle, Bell, Plus, TrendingUp,
-  Loader2, BookOpen, Zap, Music2,
+  Loader2, BookOpen, Zap, Music2, Download, FileUp, CheckCircle2,
 } from 'lucide-react'
 import { MOCK_SHOWS, SHOW_STATUS_CONFIG, type Show } from '@/lib/data'
 import { getShows, subscribeToAllShows } from '@/lib/db'
+import { supabase, isConfigured } from '@/lib/supabase'
 import NewShowModal from '@/app/components/NewShowModal'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
-
-const ARTIST_COLORS: Record<string, string> = {
-  'G Herbo':     'bg-emerald-500',
-  'SKRILLA':     'bg-violet-500',
-  'Keyshia Cole':'bg-rose-500',
-  'Flo Milli':   'bg-amber-400',
-  'K. Michelle': 'bg-teal-500',
-  'RL':          'bg-blue-500',
-  'NEXT':        'bg-sky-400',
-}
 
 const STATUS_BORDER: Record<string, string> = {
   draft:     'border-l-gray-400',
@@ -37,100 +28,233 @@ const STATUS_DOT: Record<string, string> = {
   confirmed: 'bg-emerald-500',
 }
 
-function getInitials(name: string) {
-  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-}
-
 function statusCounts(show: Show) {
   const counts = { confirmed: 0, pending: 0, unavailable: 0, substituted: 0 }
   for (const item of show.items) counts[item.status]++
   return counts
 }
 
-function ShowCard({ show, onClick }: { show: Show; onClick: () => void }) {
+async function uploadRiderPdf(showId: string, file: File): Promise<string> {
+  if (!file.type.includes('pdf')) throw new Error('Only PDF files are supported')
+  if (file.size > 26_214_400) throw new Error('File too large — max 25 MB')
+
+  const safeName = file.name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._-]/g, '')
+  const path = `${showId}/${Date.now()}-${safeName}`
+
+  const { error: upErr } = await supabase.storage
+    .from('rider-pdfs')
+    .upload(path, file, { contentType: 'application/pdf', upsert: true })
+
+  if (upErr) throw new Error(upErr.message)
+
+  const { data: { publicUrl } } = supabase.storage
+    .from('rider-pdfs')
+    .getPublicUrl(path)
+
+  const { error: dbErr } = await supabase
+    .from('shows')
+    .update({ rider_pdf_url: publicUrl })
+    .eq('id', showId)
+
+  if (dbErr) throw new Error(dbErr.message)
+
+  return publicUrl
+}
+
+function ShowCard({
+  show,
+  onClick,
+  onPdfAttached,
+}: {
+  show: Show
+  onClick: () => void
+  onPdfAttached: (showId: string, url: string) => void
+}) {
   const counts    = statusCounts(show)
   const hasIssues = counts.unavailable > 0 || counts.substituted > 0
   const unread    = show.messages.filter(m => m.from === 'buyer').length
-  const color     = ARTIST_COLORS[show.artist] ?? 'bg-gray-600'
-  const border    = STATUS_BORDER[show.status]  ?? 'border-l-gray-400'
-  const dot       = STATUS_DOT[show.status]     ?? 'bg-gray-400'
+  const border    = STATUS_BORDER[show.status] ?? 'border-l-gray-400'
+  const dot       = STATUS_DOT[show.status]   ?? 'bg-gray-400'
   const cfg       = SHOW_STATUS_CONFIG[show.status]
   const total     = show.items.length
   const pct       = total > 0 ? Math.round((counts.confirmed / total) * 100) : 0
 
+  const [dragging, setDragging]   = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState<string | null>(null)
+  const [pdfUrl, setPdfUrl]       = useState<string | undefined>(show.riderPdfUrl)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  // Sync if show prop updates
+  useEffect(() => { setPdfUrl(show.riderPdfUrl) }, [show.riderPdfUrl])
+
+  async function handleFile(file: File) {
+    setUploading(true)
+    setUploadErr(null)
+    try {
+      const url = await uploadRiderPdf(show.id, file)
+      setPdfUrl(url)
+      onPdfAttached(show.id, url)
+    } catch (e: any) {
+      setUploadErr(e.message ?? 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleFile(file)
+  }
+
   return (
-    <button
-      onClick={onClick}
-      className={`group w-full text-left bg-white rounded-2xl border border-gray-100 border-l-4 ${border} p-5 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 animate-slide-up`}
+    <div
+      className={`relative group bg-white rounded-2xl border border-gray-100 border-l-4 ${border} overflow-hidden transition-all duration-200 animate-slide-up
+        ${dragging ? 'ring-2 ring-amber-500 ring-offset-2 scale-[1.02] shadow-2xl' : 'hover:shadow-xl hover:-translate-y-0.5'}`}
+      onDragOver={e => { e.preventDefault(); setDragging(true) }}
+      onDragEnter={e => { e.preventDefault(); setDragging(true) }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
     >
-      {/* Status row */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${dot} ${show.status === 'active' ? 'animate-pulse' : ''}`} />
-          <span className={`text-xs font-black tracking-wider ${cfg.color}`}>{cfg.label.toUpperCase()}</span>
-          {hasIssues && (
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">
-              ⚠ Needs Attention
-            </span>
-          )}
-          {show.buyerApprovedAt && (
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              ✓ Received
-            </span>
-          )}
-        </div>
-        {unread > 0 && (
-          <span className="flex items-center gap-1 text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
-            <Bell size={10} /> {unread} new
-          </span>
-        )}
-      </div>
+      {/* Main clickable card */}
+      <button onClick={onClick} className="w-full text-left p-5">
 
-      {/* Artist + venue */}
-      <div className="flex items-start gap-3">
-        <div className="group-hover:scale-105 transition-transform duration-200 shadow-md rounded-xl">
-          <ArtistAvatar artist={show.artist} size={48} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-black text-gray-900 text-lg leading-tight">{show.artist}</div>
-          <div className="text-sm text-gray-500 truncate mt-0.5">{show.venue}</div>
-          <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-            <MapPin size={10} />
-            {show.city} · {new Date(show.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        {/* Status row */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${dot} ${show.status === 'active' ? 'animate-pulse' : ''}`} />
+            <span className={`text-xs font-black tracking-wider ${cfg.color}`}>{cfg.label.toUpperCase()}</span>
+            {hasIssues && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">
+                ⚠ Attention
+              </span>
+            )}
+            {show.buyerApprovedAt && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                ✓ Received
+              </span>
+            )}
           </div>
+          {unread > 0 && (
+            <span className="flex items-center gap-1 text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
+              <Bell size={10} /> {unread} new
+            </span>
+          )}
         </div>
-      </div>
 
-      {/* Progress */}
-      {total > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-50">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex gap-3 text-xs font-semibold">
-              {counts.confirmed   > 0 && <span className="text-emerald-600">✓ {counts.confirmed} confirmed</span>}
-              {counts.pending     > 0 && <span className="text-amber-500">◷ {counts.pending} pending</span>}
-              {counts.unavailable > 0 && <span className="text-red-500">✕ {counts.unavailable} unavailable</span>}
-              {counts.substituted > 0 && <span className="text-blue-500">⇄ {counts.substituted} subst.</span>}
+        {/* Artist + venue */}
+        <div className="flex items-start gap-3">
+          <div className="group-hover:scale-105 transition-transform duration-200 shadow-md rounded-xl">
+            <ArtistAvatar artist={show.artist} size={48} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-black text-gray-900 text-lg leading-tight">{show.artist}</div>
+            <div className="text-sm text-gray-500 truncate mt-0.5">{show.venue}</div>
+            <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+              <MapPin size={10} />
+              {show.city} · {new Date(show.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </div>
-            <span className="text-xs font-black text-gray-400">{pct}%</span>
           </div>
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full fill-bar"
-              style={{ width: `${pct}%` }}
-            />
+        </div>
+
+        {/* Progress */}
+        {total > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-50">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex gap-3 text-xs font-semibold">
+                {counts.confirmed   > 0 && <span className="text-emerald-600">✓ {counts.confirmed}</span>}
+                {counts.pending     > 0 && <span className="text-amber-500">◷ {counts.pending}</span>}
+                {counts.unavailable > 0 && <span className="text-red-500">✕ {counts.unavailable}</span>}
+                {counts.substituted > 0 && <span className="text-blue-500">⇄ {counts.substituted}</span>}
+              </div>
+              <span className="text-xs font-black text-gray-400">{pct}%</span>
+            </div>
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full fill-bar" style={{ width: `${pct}%` }} />
+            </div>
           </div>
+        )}
+      </button>
+
+      {/* PDF row — outside the nav button */}
+      {isConfigured && (
+        <div className="px-5 pb-4 flex items-center gap-2 border-t border-gray-50 pt-3">
+          {pdfUrl ? (
+            <>
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Download size={11} /> Official Rider PDF
+              </a>
+              <button
+                onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                title="Replace PDF"
+              >
+                Replace
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
+              className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-all border border-dashed border-gray-200 hover:border-gray-400"
+            >
+              <FileUp size={11} /> Attach Official Rider PDF
+            </button>
+          )}
+          {uploadErr && <span className="text-xs text-red-500 ml-1">{uploadErr}</span>}
         </div>
       )}
-    </button>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }}
+      />
+
+      {/* Drag-over overlay */}
+      {dragging && (
+        <div className="absolute inset-0 bg-amber-500/95 rounded-2xl flex flex-col items-center justify-center gap-2 pointer-events-none">
+          <FileUp size={28} className="text-gray-950" />
+          <span className="text-sm font-black text-gray-950">Drop PDF to attach rider</span>
+          <span className="text-xs text-gray-900/60">{show.artist}</span>
+        </div>
+      )}
+
+      {/* Upload progress overlay */}
+      {uploading && (
+        <div className="absolute inset-0 bg-gray-950/80 rounded-2xl flex flex-col items-center justify-center gap-2">
+          <Loader2 size={24} className="animate-spin text-amber-400" />
+          <span className="text-sm font-bold text-white">Uploading PDF…</span>
+        </div>
+      )}
+
+      {/* Upload success flash */}
+      {!uploading && pdfUrl && pdfUrl !== show.riderPdfUrl && (
+        <div className="absolute top-3 right-3 bg-emerald-500 text-white text-xs font-black px-2.5 py-1 rounded-full flex items-center gap-1 animate-fade-in">
+          <CheckCircle2 size={11} /> Attached
+        </div>
+      )}
+    </div>
   )
 }
 
 export default function Dashboard() {
   const router = useRouter()
-  const [filter, setFilter]       = useState<'all' | 'active' | 'issues'>('all')
-  const [shows, setShows]         = useState<Show[]>(MOCK_SHOWS)
-  const [loading, setLoading]     = useState(true)
-  const [live, setLive]           = useState(false)
+  const [filter, setFilter]         = useState<'all' | 'active' | 'issues'>('all')
+  const [shows, setShows]           = useState<Show[]>(MOCK_SHOWS)
+  const [loading, setLoading]       = useState(true)
+  const [live, setLive]             = useState(false)
   const [showNewModal, setShowNewModal] = useState(false)
 
   const load = useCallback(async () => {
@@ -151,6 +275,10 @@ export default function Dashboard() {
     return unsub
   }, [load])
 
+  function handlePdfAttached(showId: string, url: string) {
+    setShows(prev => prev.map(s => s.id === showId ? { ...s, riderPdfUrl: url } : s))
+  }
+
   const filtered      = shows.filter(s => {
     if (filter === 'active') return s.status === 'active' || s.status === 'sent'
     if (filter === 'issues') return s.items.some(i => i.status === 'unavailable' || i.status === 'substituted')
@@ -168,7 +296,6 @@ export default function Dashboard() {
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900/60 via-transparent to-black/40 pointer-events-none" />
 
         <div className="relative max-w-5xl mx-auto px-5 py-5 flex items-center justify-between gap-4">
-          {/* Brand */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
               <Zap size={20} className="text-gray-950" fill="currentColor" />
@@ -186,7 +313,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => router.push('/riders')}
@@ -205,7 +331,7 @@ export default function Dashboard() {
       </header>
 
       <div className="max-w-5xl mx-auto px-5 py-8">
-        {/* ── Stats ── */}
+        {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-amber-500 p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
@@ -230,7 +356,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ── Filters ── */}
+        {/* Filters */}
         <div className="flex items-center gap-2 mb-6">
           {(['all', 'active', 'issues'] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
@@ -248,11 +374,15 @@ export default function Dashboard() {
           </span>
         </div>
 
-        {/* ── Show grid ── */}
+        {/* Show grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtered.map((show, i) => (
             <div key={show.id} style={{ animationDelay: `${i * 60}ms` }}>
-              <ShowCard show={show} onClick={() => router.push(`/show/${show.id}`)} />
+              <ShowCard
+                show={show}
+                onClick={() => router.push(`/show/${show.id}`)}
+                onPdfAttached={handlePdfAttached}
+              />
             </div>
           ))}
           {!loading && filtered.length === 0 && (

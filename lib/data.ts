@@ -32,6 +32,7 @@ export interface Show {
   buyerApprovedAt?: string
   buyerApprovedName?: string
   riderVersion?: string
+  riderPdfUrl?: string
 }
 
 export interface MasterRiderItem {

@@ -176,12 +176,12 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
   const total = items.length
   const pct = total > 0 ? Math.round((confirmed / total) * 100) : 0
 
-  // Match artist name loosely (case-insensitive, partial) so typos/variants still work
-  const officialPdfUrl = (() => {
-    const artistLower = (show.artist ?? '').toLowerCase()
+  // Prefer dynamically uploaded PDF, fall back to static mapping
+  const officialPdfUrl = show.riderPdfUrl ?? (() => {
+    const al = (show.artist ?? '').toLowerCase()
     const key = Object.keys(OFFICIAL_RIDER_PDFS).find(k => {
       const kl = k.toLowerCase()
-      return kl === artistLower || artistLower.includes(kl) || kl.includes(artistLower)
+      return kl === al || al.includes(kl) || kl.includes(al)
     })
     return key ? OFFICIAL_RIDER_PDFS[key] : null
   })()
