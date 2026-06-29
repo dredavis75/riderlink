@@ -176,6 +176,14 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
   const total = items.length
   const pct = total > 0 ? Math.round((confirmed / total) * 100) : 0
 
+  // Case-insensitive lookup so "G Herbo" / "g herbo" both match
+  const officialPdfUrl = (() => {
+    const key = Object.keys(OFFICIAL_RIDER_PDFS).find(
+      k => k.toLowerCase() === (show.artist ?? '').toLowerCase()
+    )
+    return key ? OFFICIAL_RIDER_PDFS[key] : null
+  })()
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -215,9 +223,9 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
       <div className="max-w-2xl mx-auto px-5 py-6 space-y-6">
 
         {/* Official rider PDF download */}
-        {OFFICIAL_RIDER_PDFS[show.artist] && (
+        {officialPdfUrl && (
           <a
-            href={OFFICIAL_RIDER_PDFS[show.artist]}
+            href={officialPdfUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between gap-4 bg-gray-900 hover:bg-gray-800 text-white rounded-2xl px-5 py-4 transition-all group"
