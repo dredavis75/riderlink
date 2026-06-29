@@ -11,8 +11,24 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/casamigos|casa migos/i,                        '/rider-logos/CASA MIGOS.webp'],
   [/\bcorona\b/i,                                  '/rider-logos/CORONA.webp'],
 
-  // Production
+  // ── Production / Equipment ─────────────────────────────────────────────────
+  [/pioneer djm s9|djm.?s9|pioneer djm/i,          '/rider-logos/PIONEER DJM S9.jpg'],
+  [/cdj.?2000|cdj\b/i,                             '/rider-logos/PIONEER CDJ2000.webp'],
   [/camera|video recorder|camcorder/i,             '/rider-logos/VIDEO CAMERA.jpg'],
+
+  // ── Transportation ─────────────────────────────────────────────────────────
+  // airfare → needs Airplane.ai exported as PNG first, then add pattern here
+  [/black suv|suv.*van|sprinter van|runner.*suv|clean suv/i, '/rider-logos/BLACK SUV.jpg'],
+  [/baggage|luggage|suitcase/i,                    '/rider-logos/BAGGAGE OR SUITCASE.png'],
+
+  // ── Hotel ──────────────────────────────────────────────────────────────────
+  [/king suite/i,                                  '/rider-logos/KING SUITE.png'],
+  [/king room|non.smoking king/i,                  '/rider-logos/KING ROOM.png'],
+
+  // ── Security ───────────────────────────────────────────────────────────────
+  [/security.*dressing room|dressing room.*door/i, '/rider-logos/SECURITY DRESSING ROOM.jpg'],
+  [/security.*(?:stairs|vip)|vip.*security|stairs.*stage/i, '/rider-logos/SECURITY STAGE VIP.webp'],
+  [/security.*front.?of.?stage|front.?of.?stage.*security/i, '/rider-logos/SECURITY FRONT OF STAGE.jpg'],
 
   // ── Beverages — branded ────────────────────────────────────────────────────
   [/red bull/i,                                    '/rider-logos/RED BULL.jpeg'],
@@ -25,12 +41,13 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/aloe\s*(?:water|juice|vera|drink|variety)/i,   '/rider-logos/ALOE JUICE.jpeg'],
   [/ginger beer|ginger ale|ginger juice/i,         '/rider-logos/GINGER.jpeg'],
 
-  // Assorted / mixed sodas — handles "Assortment of Sodas", "Assorted Sodas", "Variety of Sodas"
+  // Assorted / mixed sodas
   [/assort\w+\s+(?:of\s+)?soda|mix\w*\s+soda|variety\s+(?:of\s+)?soda|soda\s+(?:variety|assort|mix)/i, '/rider-logos/ASSORTMENT OF SODAS.webp'],
   [/cases?\s+of\s+(?:soda|pop)|soda\s+cases?/i,   '/rider-logos/ASSORTMENT OF SODAS.webp'],
 
-  // Specific bottled water brands / cases
+  // Bottled water — specific first, generic last
   [/essentia/i,                                    '/rider-logos/ESSENTIA BOTTLED WATER.jpg'],
+  [/room temp\w*\s+water|water stage left/i,       '/rider-logos/ESSENTIA BOTTLED WATER.jpg'],
   [/deer park|case.* water|water.* case/i,         '/rider-logos/CASE OF DEER PARK WATER.webp'],
   [/bottled water|fiji|evian|voss/i,               '/rider-logos/SMART WATER.jpeg'],
 
@@ -45,8 +62,9 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/\btea\b/i,                                     '/rider-logos/TEA.jpg'],
 
   // ── Food ───────────────────────────────────────────────────────────────────
+  [/dinner buyout|buyout/i,                        '/rider-logos/BUYOUT.jpg'],
   [/\bpizzas?\b/i,                                 '/rider-logos/PIZZA.jpg'],
-  [/wings?|chicken wings?/i,                       '/rider-logos/WINGS.jpeg'],
+  [/fried hot chicken wings|wings?.*ranch|wings?/i,'/rider-logos/WINGS.jpeg'],
   [/fish (or|and|&) chicken|fried fish|catfish|tilapia|non.vegetarian.*fish|fish.*chicken/i, '/rider-logos/FISH AND CHICKEN.jpg'],
   [/\bfish\b/i,                                    '/rider-logos/FISH AND CHICKEN.jpg'],
   [/rolls? with butter|dinner rolls?|bread rolls?|\brolls?\b/i, '/rider-logos/ROLLS WITH BUTTER.jpg'],
@@ -57,7 +75,7 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/veggie tray|vegetable tray|crudite|assorted veggie/i, '/rider-logos/VEGGIE TRAY.jpeg'],
   [/deli tray|cold cuts|charcuterie/i,             '/rider-logos/DELI TRAY.jpeg'],
 
-  // Chips & salsa / tortilla chips — use ASSORTED CHIPS
+  // Chips & salsa
   [/tortilla chips?|chips?.*(salsa|dip)|chips? and (mango|salsa)/i, '/rider-logos/ASSORTED CHIPS.jpeg'],
   [/mango salsa|chips? & salsa/i,                  '/rider-logos/ASSORTED CHIPS.jpeg'],
   [/assorted chips?|chips? tray|\bchips?\b/i,      '/rider-logos/ASSORTED CHIPS.jpeg'],
@@ -80,8 +98,8 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/solo cups?|red cups?|plastic cups?/i,          '/rider-logos/SOLO RED CUPS.jpeg'],
   [/\bcups?\b/i,                                   '/rider-logos/SOLO RED CUPS.jpeg'],
 
-  // Ice — \bice\b only (whole word), prevents false matches on "service", "device", "advice"
-  [/\bice\b|bag of ice|bucket of ice/i,            '/rider-logos/ICE IN COOLER.jpeg'],
+  // Ice — whole word only to avoid "service", "device", "advice"
+  [/\bice\b|bag of ice|bucket of ice|container of ice/i, '/rider-logos/ICE IN COOLER.jpeg'],
 
   [/hand sanitizer/i,                              '/rider-logos/HAND SANITIZER.jpeg'],
   [/kleenex|tissues?/i,                            '/rider-logos/KLEENEX.jpeg'],
