@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, Download } from 'lucide-react'
 import { MOCK_SHOWS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
 import { getShow, updateItem as dbUpdateItem, sendMessage as dbSendMessage, subscribeToShow, approveRider } from '@/lib/db'
 import { isConfigured } from '@/lib/supabase'
@@ -181,14 +181,26 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
       {/* Header */}
       <div className="bg-gray-900 text-white">
         <div className="max-w-2xl mx-auto px-5 py-6">
-          <div className="text-xs font-semibold tracking-widest text-gray-400 uppercase mb-1">
-            Show Rider {show.riderVersion ? `· v${show.riderVersion}` : ''}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-semibold tracking-widest text-gray-400 uppercase mb-1">
+                Show Rider {show.riderVersion ? `· v${show.riderVersion}` : ''}
+              </div>
+              <h1 className="text-2xl font-black tracking-tight mb-1">{show.artist}</h1>
+              <p className="text-gray-300 text-sm">{show.venue} · {show.city}</p>
+              <p className="text-gray-400 text-sm">
+                {new Date(show.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              </p>
+            </div>
+            <a
+              href={`/api/pdf/${show.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors mt-1"
+            >
+              <Download size={13} /> Download PDF
+            </a>
           </div>
-          <h1 className="text-2xl font-black tracking-tight mb-1">{show.artist}</h1>
-          <p className="text-gray-300 text-sm">{show.venue} · {show.city}</p>
-          <p className="text-gray-400 text-sm">
-            {new Date(show.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-          </p>
           {!approved && (
             <div className="mt-5">
               <div className="flex justify-between text-xs text-gray-400 mb-2">

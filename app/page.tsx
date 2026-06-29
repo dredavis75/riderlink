@@ -113,7 +113,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => router.push('/riders')}
-              className="flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 transition-colors"
             >
               <BookOpen size={15} /> Rider Library
             </button>
