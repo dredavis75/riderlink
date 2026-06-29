@@ -353,7 +353,7 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
                     return (
                       <div key={item.id} className="px-5 py-4">
                         <div className="flex items-center justify-between gap-3">
-                          <ProductImage name={item.name} category={item.category} size={40} />
+                          <ProductImage name={item.name} category={item.category} size={80} />
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-gray-900 text-sm">{item.name}</div>
                             <div className="text-xs text-gray-400">{item.quantity}{item.notes ? ` · ${item.notes}` : ''}</div>

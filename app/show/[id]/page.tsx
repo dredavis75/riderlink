@@ -262,7 +262,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                       return (
                         <div key={item.id} className={`px-5 py-4 ${item.status === 'unavailable' ? 'bg-red-50/60' : item.status === 'substituted' ? 'bg-blue-50/60' : ''}`}>
                           <div className="flex items-start justify-between gap-3">
-                            <ProductImage name={item.name} category={item.category} size={40} />
+                            <ProductImage name={item.name} category={item.category} size={80} />
                             <div className="flex-1 min-w-0">
                               {editingItem === item.id ? (
                                 <div className="flex gap-2">

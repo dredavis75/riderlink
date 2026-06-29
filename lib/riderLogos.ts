@@ -25,9 +25,9 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/aloe.?(water|juice|vera|drink)/i,              '/rider-logos/ALOE JUICE.jpeg'],
   [/ginger beer|ginger ale|ginger juice/i,         '/rider-logos/GINGER.jpeg'],
 
-  // Assorted / mixed sodas
-  [/assort\w* soda|mix\w* soda|variety.* soda|soda.*(variety|assort|mix)/i, '/rider-logos/ASSORTMENT OF SODAS.webp'],
-  [/cases? of (soda|pop)|soda cases?/i,            '/rider-logos/ASSORTMENT OF SODAS.webp'],
+  // Assorted / mixed sodas — handles "Assortment of Sodas", "Assorted Sodas", "Variety of Sodas"
+  [/assort\w+\s+(?:of\s+)?soda|mix\w*\s+soda|variety\s+(?:of\s+)?soda|soda\s+(?:variety|assort|mix)/i, '/rider-logos/ASSORTMENT OF SODAS.webp'],
+  [/cases?\s+of\s+(?:soda|pop)|soda\s+cases?/i,   '/rider-logos/ASSORTMENT OF SODAS.webp'],
 
   // Specific bottled water brands / cases
   [/essentia/i,                                    '/rider-logos/ESSENTIA BOTTLED WATER.jpg'],
@@ -75,7 +75,7 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/\bgum\b|chewing gum/i,                         '/rider-logos/GUM.jpeg'],
 
   // ── Dressing room / essentials ─────────────────────────────────────────────
-  [/dressing room|green room/i,                    '/rider-logos/DRRESSING ROOM.jpg'],
+  [/dressing room setup|green room setup|dressing room requirements/i, '/rider-logos/DRRESSING ROOM.jpg'],
   [/candles?/i,                                    '/rider-logos/CANDLE.jpg'],
   [/solo cups?|red cups?|plastic cups?/i,          '/rider-logos/SOLO RED CUPS.jpeg'],
   [/\bcups?\b/i,                                   '/rider-logos/SOLO RED CUPS.jpeg'],
