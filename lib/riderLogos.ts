@@ -45,7 +45,7 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/\btea\b/i,                                     '/rider-logos/TEA.jpg'],
 
   // ── Food ───────────────────────────────────────────────────────────────────
-  [/\bpizza\b/i,                                   '/rider-logos/CHEESE & PEPPERONI PIZZA 2.jpg'],
+  [/\bpizza\b/i,                                   '/rider-logos/PIZZA.jpg'],
   [/wings?|chicken wings?/i,                       '/rider-logos/WINGS.jpeg'],
   [/fruit tray|fruit platter|fruit bowl/i,         '/rider-logos/FRUIT TRAY.jpeg'],
   [/veggie tray|vegetable tray|crudite/i,          '/rider-logos/VEGGIE TRAY.jpeg'],

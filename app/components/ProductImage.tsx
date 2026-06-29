@@ -17,7 +17,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   Other: '📦',
 }
 
-const CACHE_VERSION = 'v5'
+const CACHE_VERSION = 'v6'
 const imageCache = new Map<string, string | null>()
 const pending = new Map<string, Promise<string | null>>()
 
@@ -25,7 +25,7 @@ function resolveImage(name: string, category: string): Promise<string | null> {
   const key = `${CACHE_VERSION}:${name.toLowerCase()}`
   if (imageCache.has(key)) return Promise.resolve(imageCache.get(key)!)
   if (pending.has(key)) return pending.get(key)!
-  const p = fetch(`/api/product-image?v=5&q=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}`)
+  const p = fetch(`/api/product-image?v=6&q=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}`)
     .then(r => r.json())
     .then(d => { imageCache.set(key, d.imageUrl ?? null); return d.imageUrl ?? null })
     .catch(() => { imageCache.set(key, null); return null })
@@ -40,7 +40,7 @@ interface Props {
   size?: number
 }
 
-export default function ProductImage({ name, category, size = 56 }: Props) {
+export default function ProductImage({ name, category, size = 64 }: Props) {
   const [url, setUrl] = useState<string | null | undefined>(undefined)
   const emoji = CATEGORY_EMOJI[category] ?? '📦'
 
@@ -50,30 +50,30 @@ export default function ProductImage({ name, category, size = 56 }: Props) {
     resolveImage(name, category).then(setUrl)
   }, [name, category])
 
-  const base = `rounded-xl shrink-0 border border-gray-100`
-  const style = { width: size, height: size }
+  const style = { width: size, height: size, minWidth: size, minHeight: size }
 
   if (url === undefined) {
-    return <div className={`${base} bg-gray-100 animate-pulse`} style={style} />
+    return <div className="rounded-xl shrink-0 bg-gray-100 animate-pulse" style={style} />
   }
 
   if (!url) {
     return (
-      <div className={`${base} bg-gray-50 flex items-center justify-center`} style={style}>
-        <span style={{ fontSize: size * 0.45 }}>{emoji}</span>
+      <div className="rounded-xl shrink-0 bg-gray-50 border border-gray-100 flex items-center justify-center" style={style}>
+        <span style={{ fontSize: size * 0.42 }}>{emoji}</span>
       </div>
     )
   }
 
   return (
-    <img
-      src={url}
-      alt={name}
-      width={size}
-      height={size}
-      className={`${base} object-contain bg-white`}
-      style={style}
-      onError={() => setUrl(null)}
-    />
+    <div className="rounded-xl shrink-0 bg-white border border-gray-100 overflow-hidden flex items-center justify-center" style={style}>
+      <img
+        src={url}
+        alt={name}
+        width={size}
+        height={size}
+        className="object-contain w-full h-full"
+        onError={() => setUrl(null)}
+      />
+    </div>
   )
 }
