@@ -75,7 +75,7 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/\bgum\b|chewing gum/i,                         '/rider-logos/GUM.jpeg'],
 
   // ── Dressing room / essentials ─────────────────────────────────────────────
-  [/dressing room setup|green room setup|dressing room requirements/i, '/rider-logos/DRRESSING ROOM.jpg'],
+  [/dressing rooms?|green rooms?/i,                '/rider-logos/DRRESSING ROOM.jpg'],
   [/candles?/i,                                    '/rider-logos/CANDLE.jpg'],
   [/solo cups?|red cups?|plastic cups?/i,          '/rider-logos/SOLO RED CUPS.jpeg'],
   [/\bcups?\b/i,                                   '/rider-logos/SOLO RED CUPS.jpeg'],
