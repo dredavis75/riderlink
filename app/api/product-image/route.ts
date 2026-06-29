@@ -194,9 +194,12 @@ export async function GET(req: NextRequest) {
   const name = parseName(rawName)
   const cacheKey = name.toLowerCase()
 
+  // Never let the browser cache — server-side Map handles deduplication
+  const NO_CACHE = { 'Cache-Control': 'no-store' }
+
   const cached = cache.get(cacheKey)
   if (cached && Date.now() - cached.ts < TTL) {
-    return NextResponse.json({ imageUrl: cached.url }, { headers: { 'Cache-Control': 'public, max-age=86400' } })
+    return NextResponse.json({ imageUrl: cached.url }, { headers: NO_CACHE })
   }
 
   let imageUrl: string | null = null
@@ -205,13 +208,13 @@ export async function GET(req: NextRequest) {
   const local = lookupLocalLogo(name)
   if (local) {
     cache.set(cacheKey, { url: local, ts: Date.now() })
-    return NextResponse.json({ imageUrl: local }, { headers: { 'Cache-Control': 'public, max-age=86400' } })
+    return NextResponse.json({ imageUrl: local }, { headers: NO_CACHE })
   }
 
   // 1. Skip non-visual items immediately
   if (SKIP_PATTERNS.some(p => p.test(name))) {
     cache.set(cacheKey, { url: null, ts: Date.now() })
-    return NextResponse.json({ imageUrl: null })
+    return NextResponse.json({ imageUrl: null }, { headers: NO_CACHE })
   }
 
   // 2. Spirit/alcohol brand → CocktailDB
@@ -258,5 +261,5 @@ export async function GET(req: NextRequest) {
   }
 
   cache.set(cacheKey, { url: imageUrl, ts: Date.now() })
-  return NextResponse.json({ imageUrl }, { headers: { 'Cache-Control': 'public, max-age=86400' } })
+  return NextResponse.json({ imageUrl }, { headers: NO_CACHE })
 }

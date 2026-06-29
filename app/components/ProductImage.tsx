@@ -24,7 +24,7 @@ function resolveImage(name: string, category: string): Promise<string | null> {
   const key = name.toLowerCase()
   if (imageCache.has(key)) return Promise.resolve(imageCache.get(key)!)
   if (pending.has(key)) return pending.get(key)!
-  const p = fetch(`/api/product-image?q=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}&v=2`)
+  const p = fetch(`/api/product-image?q=${encodeURIComponent(name)}&category=${encodeURIComponent(category)}`)
     .then(r => r.json())
     .then(d => { imageCache.set(key, d.imageUrl ?? null); return d.imageUrl ?? null })
     .catch(() => { imageCache.set(key, null); return null })
