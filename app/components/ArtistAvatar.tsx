@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Image from 'next/image'
 
 const ARTIST_COLORS: Record<string, string> = {
   'G Herbo':     'bg-emerald-500',
@@ -14,28 +13,32 @@ const ARTIST_COLORS: Record<string, string> = {
 }
 
 function initials(name: string) {
-  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
-// Module-level cache so images persist across re-renders
-const imgCache: Record<string, string | null> = {}
-const pending: Record<string, Promise<string | null>> = {}
+// Module-level cache — survives re-renders, shared across all instances
+const imgCache: Record<string, string | null | 'loading'> = {}
+const listeners: Record<string, Array<(url: string | null) => void>> = {}
 
-function fetchArtistImage(artist: string): Promise<string | null> {
-  if (artist in imgCache) return Promise.resolve(imgCache[artist])
-  if (artist in pending) return pending[artist]
-  const p = fetch(`/api/artist-image?name=${encodeURIComponent(artist)}`)
-    .then(r => r.json())
+function resolve(artist: string, cb: (url: string | null) => void) {
+  const cached = imgCache[artist]
+  if (cached !== undefined && cached !== 'loading') { cb(cached); return }
+  if (!listeners[artist]) listeners[artist] = []
+  listeners[artist].push(cb)
+  if (cached === 'loading') return
+  imgCache[artist] = 'loading'
+  fetch(`/api/artist-image?name=${encodeURIComponent(artist)}`)
+    .then((r) => r.json())
     .then(({ url }: { url: string | null }) => {
       imgCache[artist] = url
-      return url
+      listeners[artist]?.forEach((fn) => fn(url))
+      delete listeners[artist]
     })
     .catch(() => {
       imgCache[artist] = null
-      return null
+      listeners[artist]?.forEach((fn) => fn(null))
+      delete listeners[artist]
     })
-  pending[artist] = p
-  return p
 }
 
 interface Props {
@@ -46,15 +49,17 @@ interface Props {
 }
 
 export default function ArtistAvatar({ artist, size = 48, className = '', rounded = 'rounded-xl' }: Props) {
-  const [url, setUrl] = useState<string | null>(imgCache[artist] ?? null)
+  const init = imgCache[artist]
+  const [url, setUrl] = useState<string | null>(
+    init && init !== 'loading' ? init : null
+  )
   const [broken, setBroken] = useState(false)
 
   useEffect(() => {
-    if (imgCache[artist] !== undefined) {
-      setUrl(imgCache[artist])
-      return
-    }
-    fetchArtistImage(artist).then(setUrl)
+    setBroken(false)
+    const cached = imgCache[artist]
+    if (cached && cached !== 'loading') { setUrl(cached); return }
+    resolve(artist, (u) => setUrl(u))
   }, [artist])
 
   const color = ARTIST_COLORS[artist] ?? 'bg-gray-600'
@@ -66,12 +71,11 @@ export default function ArtistAvatar({ artist, size = 48, className = '', rounde
         className={`relative overflow-hidden shrink-0 ${rounded} ${className}`}
         style={{ width: size, height: size }}
       >
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src={url}
           alt={artist}
-          fill
-          sizes={`${size}px`}
-          className="object-cover object-top"
+          className="w-full h-full object-cover object-top"
           onError={() => setBroken(true)}
         />
       </div>
