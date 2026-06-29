@@ -17,7 +17,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   Other: '📦',
 }
 
-const CACHE_VERSION = 'v12'
+const CACHE_VERSION = 'v13'
 const imageCache = new Map<string, string | null>()
 const pending = new Map<string, Promise<string | null>>()
 

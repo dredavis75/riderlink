@@ -17,7 +17,7 @@ export const RIDER_LOGO_MAP: [RegExp, string][] = [
   [/camera|video recorder|camcorder/i,             '/rider-logos/VIDEO CAMERA.jpg'],
 
   // ── Transportation ─────────────────────────────────────────────────────────
-  // airfare → needs Airplane.ai exported as PNG first, then add pattern here
+  [/airfare|round.trip air|airplane|airline/i,     '/rider-logos/AIRPLANE.jpg'],
   [/black suv|suv.*van|sprinter van|runner.*suv|clean suv/i, '/rider-logos/BLACK SUV.jpg'],
   [/baggage|luggage|suitcase/i,                    '/rider-logos/BAGGAGE OR SUITCASE.png'],
 
