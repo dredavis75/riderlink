@@ -192,28 +192,28 @@ export default function NewShowModal({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-amber-200">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-amber-200">
           <div>
             <h2 className="text-lg font-black text-gray-900">New Show</h2>
             <div className="flex items-center gap-2 mt-1">
               {STEPS.map((s, i) => (
                 <div key={s} className="flex items-center gap-2">
-                  <div className={`flex items-center gap-1.5 text-xs font-semibold ${i === step ? 'text-gray-900' : i < step ? 'text-green-600' : 'text-gray-400'}`}>
+                  <div className={`flex items-center gap-1.5 text-xs font-semibold ${i === step ? 'text-gray-900' : i < step ? 'text-emerald-400' : 'text-slate-500'}`}>
                     {i < step
-                      ? <CheckCircle2 size={13} className="text-green-500" />
-                      : <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${i === step ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-400'}`}>{i + 1}</span>
+                      ? <CheckCircle2 size={13} className="text-emerald-400" />
+                      : <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${i === step ? 'bg-amber-500 text-gray-950' : 'bg-amber-50 text-amber-800'}`}>{i + 1}</span>
                     }
                     {s}
                   </div>
-                  {i < STEPS.length - 1 && <ChevronRight size={12} className="text-gray-300" />}
+                  {i < STEPS.length - 1 && <ChevronRight size={12} className="text-slate-600" />}
                 </div>
               ))}
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button onClick={onClose} className="text-amber-800 hover:text-gray-900 transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -225,7 +225,7 @@ export default function NewShowModal({ onClose }: Props) {
             <div className="space-y-5">
               {/* Artist */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Artist</label>
+                <label className="block text-xs font-semibold text-amber-800 uppercase tracking-wider mb-1.5">Artist</label>
                 <div className="flex flex-wrap gap-2">
                   {ARTIST_ROSTER.map(a => (
                     <button
@@ -233,8 +233,8 @@ export default function NewShowModal({ onClose }: Props) {
                       onClick={() => handleArtistChange(a)}
                       className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all ${
                         artist === a
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                          ? 'bg-amber-500 text-gray-950 border-amber-500'
+                          : 'bg-amber-50 text-amber-900 border-amber-200 hover:border-slate-400 hover:bg-amber-100'
                       }`}
                     >
                       {a}
@@ -244,14 +244,14 @@ export default function NewShowModal({ onClose }: Props) {
                     placeholder="Other artist…"
                     value={ARTIST_ROSTER.includes(artist as any) ? '' : artist}
                     onChange={e => handleArtistChange(e.target.value)}
-                    className="px-3.5 py-2 rounded-xl text-sm border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400 min-w-[140px]"
+                    className="px-3.5 py-2 rounded-xl text-sm bg-amber-50 border border-amber-200 placeholder-slate-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 min-w-[140px]"
                   />
                 </div>
               </div>
 
               {/* Venue autocomplete */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Venue</label>
+                <label className="block text-xs font-semibold text-amber-800 uppercase tracking-wider mb-1.5">Venue</label>
                 <div className="relative" ref={dropdownRef}>
                   <div className="relative">
                     <input
@@ -260,7 +260,7 @@ export default function NewShowModal({ onClose }: Props) {
                       onFocus={() => predictions.length > 0 && setShowDropdown(true)}
                       placeholder="Start typing a venue name or city…"
                       autoComplete="off"
-                      className="w-full px-3.5 py-2.5 pr-9 rounded-xl text-sm border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                      className="w-full px-3.5 py-2.5 pr-9 rounded-xl text-sm bg-amber-50 border border-amber-200 placeholder-slate-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                     {searching
                       ? <Loader2 size={14} className="absolute right-3 top-3 animate-spin text-gray-400" />
@@ -269,15 +269,15 @@ export default function NewShowModal({ onClose }: Props) {
                   </div>
 
                   {showDropdown && predictions.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                    <div className="absolute z-50 w-full mt-1 bg-amber-50 border border-amber-200 rounded-xl shadow-2xl overflow-hidden">
                       {predictions.map(p => (
                         <button
                           key={p.placeId}
                           onMouseDown={() => selectVenue(p)}
-                          className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                          className="w-full text-left px-4 py-3 hover:bg-amber-100 transition-colors border-b border-amber-200 last:border-0"
                         >
                           <div className="text-sm font-semibold text-gray-900">{p.name}</div>
-                          {p.secondary && <div className="text-xs text-gray-500 mt-0.5">{p.secondary}</div>}
+                          {p.secondary && <div className="text-xs text-amber-800 mt-0.5">{p.secondary}</div>}
                         </button>
                       ))}
                     </div>
@@ -287,29 +287,29 @@ export default function NewShowModal({ onClose }: Props) {
 
               {/* City — auto-filled but editable */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">City</label>
+                <label className="block text-xs font-semibold text-amber-800 uppercase tracking-wider mb-1.5">City</label>
                 <input
                   value={city}
                   onChange={e => setCity(e.target.value)}
                   placeholder="Auto-filled when you pick a venue"
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-amber-50 border border-amber-200 placeholder-slate-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
               {/* Date */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Show Date</label>
+                <label className="block text-xs font-semibold text-amber-800 uppercase tracking-wider mb-1.5">Show Date</label>
                 <input
                   type="date"
                   value={date}
                   onChange={e => setDate(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-gray-200 focus:outline-none focus:border-gray-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-amber-50 border border-amber-200 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
               {/* Buyer */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Buyer / Promoter</label>
+                <label className="block text-xs font-semibold text-amber-800 uppercase tracking-wider mb-1.5">Buyer / Promoter</label>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="relative" ref={buyerDropdownRef}>
                     <input
@@ -318,7 +318,7 @@ export default function NewShowModal({ onClose }: Props) {
                       onFocus={() => promoterHits.length > 0 && setShowBuyerDropdown(true)}
                       placeholder="Full name"
                       autoComplete="off"
-                      className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-amber-50 border border-amber-200 placeholder-slate-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                     {showBuyerDropdown && promoterHits.length > 0 && (
                       <div className="absolute z-50 w-72 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
@@ -326,10 +326,10 @@ export default function NewShowModal({ onClose }: Props) {
                           <button
                             key={i}
                             onMouseDown={() => selectBuyer(p)}
-                            className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                            className="w-full text-left px-4 py-3 hover:bg-amber-100 transition-colors border-b border-amber-200 last:border-0"
                           >
                             <div className="text-sm font-semibold text-gray-900">{p.name}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">{p.email}</div>
+                            <div className="text-xs text-amber-800 mt-0.5">{p.email}</div>
                             <div className="text-xs text-gray-400">{p.venue} · {p.city}</div>
                           </button>
                         ))}
@@ -341,7 +341,7 @@ export default function NewShowModal({ onClose }: Props) {
                     value={buyerEmail}
                     onChange={e => setBuyerEmail(e.target.value)}
                     placeholder="email@venue.com"
-                    className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-amber-50 border border-amber-200 placeholder-slate-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
               </div>
@@ -354,13 +354,13 @@ export default function NewShowModal({ onClose }: Props) {
                 <div className="flex gap-3">
                   <button
                     onClick={() => { setUseTemplate(true); setItems(defaultItems()) }}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${useTemplate ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${useTemplate ? 'bg-amber-500 text-gray-950 border-amber-500' : 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100'}`}
                   >
                     Use {artist} standard rider
                   </button>
                   <button
                     onClick={() => { setUseTemplate(false); setItems([]) }}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${!useTemplate ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${!useTemplate ? 'bg-amber-500 text-gray-950 border-amber-500' : 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100 hover:border-slate-400'}`}
                   >
                     Start blank
                   </button>
@@ -369,12 +369,12 @@ export default function NewShowModal({ onClose }: Props) {
 
               <div className="space-y-2">
                 {items.map((item, idx) => (
-                  <div key={idx} className="flex gap-2 items-start bg-gray-50 rounded-xl p-3">
+                  <div key={idx} className="flex gap-2 items-start bg-amber-50 rounded-xl p-3">
                     <div className="flex-1 grid grid-cols-12 gap-2">
                       <select
                         value={item.category}
                         onChange={e => updateItem(idx, 'category', e.target.value)}
-                        className="col-span-3 px-2.5 py-1.5 rounded-lg text-xs border border-gray-200 bg-white focus:outline-none focus:border-gray-400"
+                        className="col-span-3 px-2.5 py-1.5 rounded-lg text-xs bg-amber-100 border border-amber-200 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                       >
                         {!CATEGORIES.includes(item.category) && (
                           <option value={item.category}>{item.category}</option>
@@ -385,19 +385,19 @@ export default function NewShowModal({ onClose }: Props) {
                         value={item.name}
                         onChange={e => updateItem(idx, 'name', e.target.value)}
                         placeholder="Item name"
-                        className="col-span-5 px-2.5 py-1.5 rounded-lg text-xs border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                        className="col-span-5 px-2.5 py-1.5 rounded-lg text-xs bg-amber-100 border border-amber-200 text-gray-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                       <input
                         value={item.quantity}
                         onChange={e => updateItem(idx, 'quantity', e.target.value)}
                         placeholder="Qty"
-                        className="col-span-2 px-2.5 py-1.5 rounded-lg text-xs border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                        className="col-span-2 px-2.5 py-1.5 rounded-lg text-xs bg-amber-100 border border-amber-200 text-gray-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                       <input
                         value={item.notes}
                         onChange={e => updateItem(idx, 'notes', e.target.value)}
                         placeholder="Notes"
-                        className="col-span-2 px-2.5 py-1.5 rounded-lg text-xs border border-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-400"
+                        className="col-span-2 px-2.5 py-1.5 rounded-lg text-xs bg-amber-100 border border-amber-200 text-gray-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                     </div>
                     <button onClick={() => removeItem(idx)} className="text-gray-400 hover:text-red-500 transition-colors mt-1.5">
@@ -409,7 +409,7 @@ export default function NewShowModal({ onClose }: Props) {
 
               <button
                 onClick={addItem}
-                className="w-full py-2.5 rounded-xl text-sm font-semibold border border-dashed border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-all"
+                className="w-full py-2.5 rounded-xl text-sm font-semibold border border-dashed border-amber-200 text-amber-800 hover:border-slate-400 hover:text-gray-900 transition-all"
               >
                 + Add item
               </button>
@@ -420,16 +420,16 @@ export default function NewShowModal({ onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-amber-200 flex items-center justify-between">
           {step === 1
-            ? <button onClick={() => setStep(0)} className="text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors">← Back</button>
+            ? <button onClick={() => setStep(0)} className="text-sm font-semibold text-amber-800 hover:text-gray-900 transition-colors">← Back</button>
             : <div />
           }
           {step === 0 ? (
             <button
               onClick={goToStep2}
               disabled={!step1Valid}
-              className="flex items-center gap-2 bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-bold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Next: Rider <ChevronRight size={14} />
             </button>
@@ -437,7 +437,7 @@ export default function NewShowModal({ onClose }: Props) {
             <button
               onClick={handleCreate}
               disabled={saving}
-              className="flex items-center gap-2 bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-gray-700 transition-colors disabled:opacity-40"
+              className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-bold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-40"
             >
               {saving ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : 'Create Show'}
             </button>

@@ -1,5 +1,5 @@
 import { supabase, isConfigured } from './supabase'
-import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem, RiderTemplate, RiderPdfSection } from './data'
+import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem, RiderTemplate, RiderPdfSection, DayOfShowContacts, BuyerAttachment } from './data'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -17,6 +17,11 @@ function mapShow(row: any): Show {
     buyerApprovedName: row.buyer_approved_name ?? undefined,
     riderVersion: row.rider_version ?? undefined,
     riderPdfUrl: row.rider_pdf_url ?? undefined,
+    runOfShowText: row.run_of_show_text ?? undefined,
+    runOfShowPdfUrl: row.run_of_show_pdf_url ?? undefined,
+    curfew: row.curfew ?? undefined,
+    dayOfShowContacts: row.day_of_show_contacts ?? undefined,
+    buyerAttachments: row.buyer_attachments ?? undefined,
     items: (row.rider_items ?? [])
       .sort((a: any, b: any) => a.sort_order - b.sort_order)
       .map((i: any): RiderItem => ({
@@ -131,9 +136,19 @@ export async function updateShowStatus(showId: string, status: Show['status']) {
   if (error) throw error
 }
 
+export async function updateBuyer(showId: string, buyerName: string, buyerEmail: string) {
+  const { error } = await supabase.from('shows').update({ buyer_name: buyerName, buyer_email: buyerEmail }).eq('id', showId)
+  if (error) throw error
+}
+
 // ── Rider Items ───────────────────────────────────────────────────────────────
 
-export async function updateItem(itemId: string, fields: { status?: ItemStatus; name?: string; buyer_note?: string }) {
+export async function deleteShowItem(itemId: string): Promise<void> {
+  const { error } = await supabase.from('rider_items').delete().eq('id', itemId)
+  if (error) throw error
+}
+
+export async function updateItem(itemId: string, fields: { status?: ItemStatus; name?: string; buyer_note?: string; category?: string }) {
   const { error } = await supabase.from('rider_items').update(fields).eq('id', itemId)
   if (error) throw error
 }
@@ -172,6 +187,26 @@ export async function approveRider(showId: string, buyerName: string) {
   if (error) throw error
 }
 
+export async function saveShowDayOfShow(
+  showId: string,
+  data: {
+    runOfShowText?: string
+    runOfShowPdfUrl?: string
+    curfew?: string
+    dayOfShowContacts?: DayOfShowContacts
+    buyerAttachments?: BuyerAttachment[]
+  }
+) {
+  const fields: Record<string, unknown> = {}
+  if (data.runOfShowText !== undefined) fields.run_of_show_text = data.runOfShowText
+  if (data.runOfShowPdfUrl !== undefined) fields.run_of_show_pdf_url = data.runOfShowPdfUrl
+  if (data.curfew !== undefined) fields.curfew = data.curfew
+  if (data.dayOfShowContacts !== undefined) fields.day_of_show_contacts = data.dayOfShowContacts
+  if (data.buyerAttachments !== undefined) fields.buyer_attachments = data.buyerAttachments
+  const { error } = await supabase.from('shows').update(fields).eq('id', showId)
+  if (error) throw error
+}
+
 // ── Master Riders ─────────────────────────────────────────────────────────────
 
 function mapMasterRider(row: any): MasterRider {
@@ -180,6 +215,7 @@ function mapMasterRider(row: any): MasterRider {
     artist: row.artist,
     version: row.version,
     updatedAt: row.updated_at,
+    pdfUrl: row.pdf_url ?? undefined,
     items: (row.rider_master_items ?? [])
       .sort((a: any, b: any) => a.sort_order - b.sort_order)
       .map((i: any): MasterRiderItem => ({
@@ -300,6 +336,14 @@ export async function bumpMasterVersion(masterId: string, newVersion: string): P
   if (error) throw error
 }
 
+export async function saveMasterPdfUrl(masterId: string, pdfUrl: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('rider_masters')
+    .update({ pdf_url: pdfUrl })
+    .eq('id', masterId)
+  if (error) throw error
+}
+
 // ── Real-time subscriptions ───────────────────────────────────────────────────
 
 export function subscribeToShow(showId: string, onUpdate: () => void) {
@@ -383,4 +427,77 @@ export async function deleteSection(id: string): Promise<void> {
 
 export async function updateSectionLabel(id: string, label: string): Promise<void> {
   await supabase.from('rider_pdf_sections').update({ label }).eq('id', id)
+}
+
+// ── Artist Management Contacts ────────────────────────────────────────────────
+
+export interface ManagementContact {
+  id: string
+  artist: string
+  name: string
+  email: string
+  phone: string
+  role: string
+  sortOrder: number
+}
+
+function mapContact(row: any): ManagementContact {
+  return {
+    id: row.id,
+    artist: row.artist,
+    name: row.name,
+    email: row.email ?? '',
+    phone: row.phone ?? '',
+    role: row.role ?? 'Management',
+    sortOrder: row.sort_order ?? 0,
+  }
+}
+
+export async function getManagementContacts(artist: string): Promise<ManagementContact[]> {
+  const { data } = await supabase
+    .from('artist_management')
+    .select('*')
+    .eq('artist', artist)
+    .order('sort_order')
+  return (data ?? []).map(mapContact)
+}
+
+export async function getAllManagementContacts(): Promise<Record<string, ManagementContact[]>> {
+  const { data } = await supabase
+    .from('artist_management')
+    .select('*')
+    .order('sort_order')
+  const out: Record<string, ManagementContact[]> = {}
+  for (const row of data ?? []) {
+    const c = mapContact(row)
+    if (!out[c.artist]) out[c.artist] = []
+    out[c.artist].push(c)
+  }
+  return out
+}
+
+export async function addManagementContact(
+  artist: string,
+  contact: Omit<ManagementContact, 'id' | 'artist' | 'sortOrder'>,
+  sortOrder: number
+): Promise<ManagementContact> {
+  const { data, error } = await supabase
+    .from('artist_management')
+    .insert({ artist, ...contact, sort_order: sortOrder })
+    .select()
+    .single()
+  if (error || !data) throw error
+  return mapContact(data)
+}
+
+export async function updateManagementContact(
+  id: string,
+  fields: Partial<Pick<ManagementContact, 'name' | 'email' | 'phone' | 'role'>>
+): Promise<void> {
+  const { error } = await supabase.from('artist_management').update(fields).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteManagementContact(id: string): Promise<void> {
+  await supabase.from('artist_management').delete().eq('id', id)
 }

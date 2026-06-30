@@ -13,7 +13,7 @@ const twilioClient =
     : null
 
 export interface NotifyPayload {
-  type: 'rider_submitted' | 'buyer_message'
+  type: 'rider_submitted' | 'buyer_message' | 'day_of_show_submitted'
   showId: string
   artistName: string
   venue: string
@@ -24,6 +24,15 @@ export interface NotifyPayload {
   confirmedCount?: number
   totalCount?: number
   messageText?: string
+  curfew?: string
+  runOfShowText?: string
+  runOfShowPdfUrl?: string
+  dayOfShowContacts?: {
+    artistRelations:  { name: string; phone: string; email: string }
+    headOfSecurity:   { name: string; phone: string; email: string }
+    settlement:       { name: string; phone: string; email: string }
+    productionManager:{ name: string; phone: string; email: string }
+  }
 }
 
 function formatDate(d: string) {
@@ -35,6 +44,53 @@ function buildEmail(payload: NotifyPayload): { subject: string; html: string } {
   const dateStr = formatDate(payload.date)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const showUrl = `${appUrl}/show/${payload.showId}`
+
+  if (payload.type === 'day_of_show_submitted') {
+    const c = payload.dayOfShowContacts
+    const contactRows = c ? [
+      { role: 'Artist Relations',   ...c.artistRelations },
+      { role: 'Head of Security',   ...c.headOfSecurity },
+      { role: 'Settlement Contact', ...c.settlement },
+      { role: 'Production Manager', ...c.productionManager },
+    ].filter(r => r.name || r.phone || r.email).map(r => `
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;vertical-align:top">
+          <div style="font-size:12px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">${r.role}</div>
+          <div style="font-size:14px;font-weight:600;color:#111827">${r.name || '—'}</div>
+          ${r.phone ? `<div style="font-size:13px;color:#4b5563;margin-top:2px">📞 ${r.phone}</div>` : ''}
+          ${r.email ? `<div style="font-size:13px;color:#4b5563;margin-top:2px">✉️ ${r.email}</div>` : ''}
+        </td>
+      </tr>
+    `).join('') : ''
+
+    const rosText = payload.runOfShowText
+      ? `<div style="background:#f9fafb;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:16px 20px;font-size:13px;color:#111827;white-space:pre-wrap;font-family:monospace;line-height:1.6">${payload.runOfShowText}</div>`
+      : payload.runOfShowPdfUrl
+      ? `<div style="margin-top:8px"><a href="${payload.runOfShowPdfUrl}" style="display:inline-block;background:#f59e0b;color:#111827;text-decoration:none;font-weight:700;font-size:13px;padding:10px 20px;border-radius:8px">📄 Download Run of Show PDF →</a></div>`
+      : '<p style="color:#6b7280;font-size:13px">No run of show provided.</p>'
+
+    return {
+      subject: `📋 Day of Show info from ${payload.buyerName} — ${showLine}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:580px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
+          <div style="background:#111827;padding:24px 28px">
+            <div style="color:#9ca3af;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">RiderLink · Day of Show</div>
+            <div style="color:#fff;font-size:20px;font-weight:900">${showLine}</div>
+            <div style="color:#9ca3af;font-size:13px;margin-top:4px">${dateStr}</div>
+          </div>
+          <div style="padding:28px">
+            ${payload.curfew ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:14px;font-weight:700;color:#b91c1c">⏰ Curfew: ${payload.curfew}</div>` : '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:14px;font-weight:700;color:#15803d">✅ No venue curfew</div>'}
+            <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#374151">Run of Show</p>
+            ${rosText}
+            ${c ? `<p style="margin:24px 0 12px;font-size:14px;font-weight:700;color:#374151">Day of Show Contacts</p><table style="width:100%;border-collapse:collapse">${contactRows}</table>` : ''}
+            <div style="margin-top:24px">
+              <a href="${showUrl}" style="display:inline-block;background:#111827;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 24px;border-radius:10px">View Show →</a>
+            </div>
+          </div>
+        </div>
+      `,
+    }
+  }
 
   if (payload.type === 'buyer_message') {
     return {
@@ -135,6 +191,11 @@ function buildSms(payload: NotifyPayload): string {
   const show = `${payload.artistName} @ ${payload.venue}`
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const link = `${appUrl}/show/${payload.showId}`
+
+  if (payload.type === 'day_of_show_submitted') {
+    const curfewNote = payload.curfew ? `Curfew: ${payload.curfew}.` : 'No curfew.'
+    return `RiderLink 📋 Day of show info from ${payload.buyerName} (${show}). ${curfewNote} ${link}`
+  }
 
   if (payload.type === 'buyer_message') {
     const preview = (payload.messageText ?? '').slice(0, 80)

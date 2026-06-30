@@ -208,7 +208,7 @@ function RiderPDF({ show }: { show: Show }) {
   const pending = show.items.filter(i => i.status === 'pending').length
   const unavailable = show.items.filter(i => i.status === 'unavailable').length
   const substituted = show.items.filter(i => i.status === 'substituted').length
-  const showDate = new Date(show.date).toLocaleDateString('en-US', {
+  const showDate = new Date(show.date + 'T12:00:00').toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   })
   const exportDate = new Date().toLocaleDateString('en-US', {

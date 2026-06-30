@@ -120,10 +120,10 @@ export default function SyncDatesModal({ onClose, existingShows, onImport }: Pro
 
   return (
     <div className="fixed inset-0 z-50 bg-gray-950/80 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
+      <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl border border-amber-200">
 
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between shrink-0">
+        <div className="px-6 py-5 border-b border-amber-200 flex items-center justify-between shrink-0">
           <div>
             <h2 className="font-black text-gray-900 text-xl">Sync Tour Dates</h2>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -135,10 +135,10 @@ export default function SyncDatesModal({ onClose, existingShows, onImport }: Pro
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={fetch} disabled={loading} className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all">
+            <button onClick={fetch} disabled={loading} className="p-2 text-gray-500 hover:text-gray-900 hover:bg-amber-50 rounded-xl transition-all">
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
-            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all">
+            <button onClick={onClose} className="p-2 text-gray-500 hover:text-gray-900 hover:bg-amber-50 rounded-xl transition-all">
               <X size={16} />
             </button>
           </div>
@@ -146,14 +146,14 @@ export default function SyncDatesModal({ onClose, existingShows, onImport }: Pro
 
         {/* Stats bar */}
         {!loading && dates.length > 0 && (
-          <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-4 text-sm shrink-0">
+          <div className="px-6 py-3 border-b border-amber-200 flex items-center gap-4 text-sm shrink-0">
             <span className="font-black text-gray-900">{dates.length} dates found</span>
             {newCount > 0 && <span className="text-emerald-600 font-bold">+{newCount} new</span>}
             {cancelledCount > 0 && <span className="text-red-500 font-bold">{cancelledCount} cancelled</span>}
             {postponedCount > 0 && <span className="text-amber-500 font-bold">{postponedCount} postponed</span>}
             <div className="ml-auto flex items-center gap-2">
               <button onClick={selectAll} className="text-xs font-bold text-gray-500 hover:text-gray-900 transition-colors">Select all new</button>
-              <span className="text-gray-300">·</span>
+              <span className="text-slate-600">·</span>
               <button onClick={clearAll} className="text-xs font-bold text-gray-500 hover:text-gray-900 transition-colors">Clear</button>
             </div>
           </div>
@@ -161,15 +161,15 @@ export default function SyncDatesModal({ onClose, existingShows, onImport }: Pro
 
         {/* Filters */}
         {!loading && dates.length > 0 && (
-          <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap shrink-0">
+          <div className="px-6 py-3 border-b border-amber-200 flex items-center gap-2 flex-wrap shrink-0">
             {(['all', 'new', 'confirmed', 'cancelled', 'postponed'] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg capitalize transition-all ${filter === f ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg capitalize transition-all ${filter === f ? 'bg-amber-500 text-gray-950' : 'bg-white border border-amber-200 text-amber-800 hover:bg-amber-50'}`}>
                 {f === 'new' ? `New (${newCount})` : f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
             ))}
             <select value={artistFilter} onChange={e => setArtistFilter(e.target.value)}
-              className="ml-auto text-xs font-bold border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none">
+              className="ml-auto text-xs font-bold bg-amber-50 border border-amber-200 text-gray-900 rounded-lg px-2 py-1.5 focus:outline-none">
               <option value="all">All Artists</option>
               {ARTIST_ROSTER.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
@@ -186,20 +186,20 @@ export default function SyncDatesModal({ onClose, existingShows, onImport }: Pro
           )}
 
           {error && (
-            <div className="m-6 bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
-              <AlertTriangle size={18} className="text-red-500 shrink-0" />
-              <p className="text-sm font-semibold text-red-700">{error}</p>
+            <div className="m-6 bg-red-900/30 border border-red-800 rounded-2xl p-4 flex items-center gap-3">
+              <AlertTriangle size={18} className="text-red-400 shrink-0" />
+              <p className="text-sm font-semibold text-red-400">{error}</p>
             </div>
           )}
 
           {!loading && !error && filtered.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 gap-2 text-gray-400">
-              <p className="font-bold">No dates match this filter</p>
+            <div className="flex flex-col items-center justify-center py-20 gap-2 text-gray-500">
+              <p className="font-bold text-gray-500">No dates match this filter</p>
             </div>
           )}
 
           {!loading && filtered.length > 0 && (
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-amber-900/30">
               {filtered.map(d => {
                 const cfg = STATUS_CONFIG[d.status] ?? STATUS_CONFIG.confirmed
                 const existing = isExisting(d)
@@ -209,25 +209,25 @@ export default function SyncDatesModal({ onClose, existingShows, onImport }: Pro
                 return (
                   <div key={d.sourceId}
                     onClick={() => !existing && toggle(d.sourceId)}
-                    className={`flex items-center gap-4 px-6 py-4 transition-all ${existing ? 'opacity-50 cursor-default' : 'cursor-pointer hover:bg-gray-50'} ${isSelected && !existing ? 'bg-amber-50/50' : ''}`}
+                    className={`flex items-center gap-4 px-6 py-4 transition-all ${existing ? 'opacity-50 cursor-default' : 'cursor-pointer hover:bg-amber-50'} ${isSelected && !existing ? 'bg-amber-50' : ''}`}
                   >
                     {/* Checkbox */}
-                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${existing ? 'bg-gray-200 border-gray-200' : isSelected ? 'bg-gray-900 border-gray-900' : 'border-gray-300'}`}>
-                      {existing ? <Check size={11} className="text-gray-400" /> : isSelected ? <Check size={11} className="text-white" /> : null}
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${existing ? 'bg-amber-100 border-amber-200' : isSelected ? 'bg-amber-500 border-amber-500' : 'border-amber-200'}`}>
+                      {existing ? <Check size={11} className="text-gray-400" /> : isSelected ? <Check size={11} className="text-gray-900" /> : null}
                     </div>
 
                     {/* Artist photo */}
-                    <ArtistAvatar artist={d.artist} size={36} rounded="rounded-lg" />
+                    <ArtistAvatar artist={d.artist} size={52} rounded="rounded-lg" />
 
                     {/* Date info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-black text-gray-900 text-sm">{d.artist}</span>
                         <span className={`text-xs font-bold ${cfg.color}`}>· {cfg.label}</span>
-                        {existing && <span className="text-xs font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Already added</span>}
+                        {existing && <span className="text-xs font-bold text-gray-500 bg-amber-50 px-1.5 py-0.5 rounded">Already added</span>}
                       </div>
                       <div className="text-sm text-gray-600 truncate mt-0.5">{d.venue}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">
+                      <div className="text-xs text-gray-500 mt-0.5">
                         {d.city}{d.country && d.country !== 'US' ? `, ${d.country}` : ''} ·{' '}
                         {dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                         {d.time && ` · ${d.time}`}
@@ -242,7 +242,7 @@ export default function SyncDatesModal({ onClose, existingShows, onImport }: Pro
                       {d.ticketUrl && (
                         <a href={d.ticketUrl} target="_blank" rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}
-                          className="text-gray-300 hover:text-gray-600 transition-colors">
+                          className="text-slate-500 hover:text-gray-900 transition-colors">
                           <ExternalLink size={13} />
                         </a>
                       )}
@@ -256,12 +256,12 @@ export default function SyncDatesModal({ onClose, existingShows, onImport }: Pro
 
         {/* Footer */}
         {!loading && (
-          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between shrink-0">
+          <div className="px-6 py-4 border-t border-amber-200 flex items-center justify-between shrink-0">
             <span className="text-sm text-gray-500 font-semibold">
               {selected.size > 0 ? `${selected.size} date${selected.size !== 1 ? 's' : ''} selected` : 'No dates selected'}
             </span>
             <div className="flex items-center gap-3">
-              <button onClick={onClose} className="px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors">
+              <button onClick={onClose} className="px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-900 transition-colors">
                 Cancel
               </button>
               <button

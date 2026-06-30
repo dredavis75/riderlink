@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { sendSms, formatPhone } from '@/lib/sms'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+const COMPANY_NAME = process.env.NEXT_PUBLIC_COMPANY_NAME ?? 'Blue Alley Touring'
+const FROM_EMAIL   = process.env.EMAIL_FROM_ADDRESS ?? 'noreply@bluealleytouring.com'
 
 export async function POST(req: NextRequest) {
-  const { emails, artistName, venue, city, date, showId, senderName } = await req.json()
+  const { emails, phones, artistName, venue, city, date, showId, senderName } = await req.json()
 
   if (!emails?.length || !showId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -19,7 +22,7 @@ export async function POST(req: NextRequest) {
   for (const email of emails) {
     try {
       await resend.emails.send({
-        from: 'RiderLink <noreply@riderlink.vercel.app>',
+        from: `RiderLink <${FROM_EMAIL}>`,
         to: email.trim(),
         subject: `${artistName} — Show Rider Access · ${venue}`,
         html: `
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest) {
                 </div>
                 <div>
                   <div style="color: white; font-weight: 900; font-size: 18px;">RiderLink</div>
-                  <div style="color: #f59e0b; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;">Blue Alley Touring</div>
+                  <div style="color: #f59e0b; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;">${COMPANY_NAME}</div>
                 </div>
               </div>
             </div>
@@ -53,13 +56,28 @@ export async function POST(req: NextRequest) {
         `,
       })
     } catch (err: any) {
+      console.error('share-rider send error:', err)
       errors.push(`${email}: ${err.message}`)
     }
   }
 
-  if (errors.length === emails.length) {
+  if (errors.length === emails.length && !phones?.length) {
     return NextResponse.json({ error: 'All sends failed', details: errors }, { status: 500 })
   }
 
-  return NextResponse.json({ sent: emails.length - errors.length, errors })
+  // SMS to any phone numbers provided
+  const smsErrors: string[] = []
+  for (const phone of phones ?? []) {
+    const e164 = formatPhone(phone)
+    if (!e164) continue
+    try {
+      await sendSms(e164,
+        `${senderName ?? COMPANY_NAME} shared the ${artistName} show rider with you for ${venue} (${city}).\n\nView it here: ${buyerUrl}`
+      )
+    } catch (err: any) {
+      smsErrors.push(`${phone}: ${err.message}`)
+    }
+  }
+
+  return NextResponse.json({ sent: emails.length - errors.length, errors, smsErrors })
 }

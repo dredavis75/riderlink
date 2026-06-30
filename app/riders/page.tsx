@@ -4,15 +4,19 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, ChevronDown, ChevronUp, Edit3, Check, X,
-  Plus, Trash2, Save, RefreshCw, Loader2, BookOpen
+  Plus, Trash2, Save, Loader2, BookOpen, Download, Upload, FileText, Sparkles, UserPlus, Phone, Mail, Users,
 } from 'lucide-react'
 import {
-  RIDER_TEMPLATES, ARTIST_ROSTER, type MasterRider, type MasterRiderItem,
+  ARTIST_ROSTER, OFFICIAL_RIDER_PDFS, type MasterRider, type MasterRiderItem,
 } from '@/lib/data'
 import {
-  getRiderMasters, seedRiderMasters, addMasterItem,
-  updateMasterItem, deleteMasterItem, bumpMasterVersion,
+  getRiderMasters, addMasterItem,
+  updateMasterItem, deleteMasterItem, bumpMasterVersion, saveMasterPdfUrl,
+  getAllManagementContacts, addManagementContact, updateManagementContact, deleteManagementContact,
+  type ManagementContact,
 } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
+import { PDFDocument } from 'pdf-lib'
 import { isConfigured } from '@/lib/supabase'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
 
@@ -21,6 +25,34 @@ type LocalItem = { id: string; category: string; name: string; quantity: string;
 function nextVersion(v: string) {
   const [major, minor] = v.split('.').map(Number)
   return `${major}.${(minor ?? 0) + 1}`
+}
+
+const CATEGORY_ORDER = [
+  'Dressing Room',
+  'Food',
+  'Beverages',
+  'Production Office',
+  'Dancers Room',
+  'Band Room',
+  'Essentials',
+  'Dinner',
+  'Security',
+  'Venue',
+  'Production',
+  'Transportation',
+  'Hotel',
+  'Other',
+]
+
+function sortCategories(cats: string[]): string[] {
+  return [...cats].sort((a, b) => {
+    const ai = CATEGORY_ORDER.findIndex(c => c.toLowerCase() === a.toLowerCase())
+    const bi = CATEGORY_ORDER.findIndex(c => c.toLowerCase() === b.toLowerCase())
+    if (ai === -1 && bi === -1) return a.localeCompare(b)
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
 }
 
 function groupByCategory(items: LocalItem[]) {
@@ -35,34 +67,126 @@ export default function RiderLibrary() {
   const router = useRouter()
   const [masters, setMasters] = useState<MasterRider[]>([])
   const [loading, setLoading] = useState(true)
-  const [seeding, setSeeding] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null) // artist being edited
   const [editItems, setEditItems] = useState<LocalItem[]>([])
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [uploadingPdf, setUploadingPdf] = useState<string | null>(null)
+  const [extractingPdf, setExtractingPdf] = useState<string | null>(null)
+  const [extractResults, setExtractResults] = useState<Record<string, string>>({})
+  const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({})
+  const [mgmtByArtist, setMgmtByArtist] = useState<Record<string, ManagementContact[]>>({})
+  const [mgmtOpen, setMgmtOpen] = useState<string | null>(null)
+  const [editingContact, setEditingContact] = useState<string | null>(null)
+  const [contactDraft, setContactDraft] = useState<Partial<ManagementContact>>({})
+  const [addingContact, setAddingContact] = useState<string | null>(null)
+  const [newContact, setNewContact] = useState({ name: '', email: '', phone: '', role: 'Management' })
+  const [savingContact, setSavingContact] = useState(false)
 
   const load = useCallback(async () => {
     if (!isConfigured) { setLoading(false); return }
     try {
       const data = await getRiderMasters()
       setMasters(data)
+      const urls: Record<string, string> = {}
+      for (const m of data) { if (m.pdfUrl) urls[m.id] = m.pdfUrl }
+      setPdfUrls(urls)
     } catch {}
+    try {
+      const all = await getAllManagementContacts()
+      setMgmtByArtist(all)
+    } catch (e) { console.error('mgmt load:', e) }
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
-
-  async function handleSeed() {
-    setSeeding(true)
+  async function handleSaveNewContact(artist: string) {
+    if (!newContact.name.trim() && !newContact.email.trim()) return
+    setSavingContact(true)
     try {
-      await seedRiderMasters(RIDER_TEMPLATES)
-      await load()
-    } catch (e) {
-      console.error(e)
-    }
-    setSeeding(false)
+      const existing = mgmtByArtist[artist] ?? []
+      const c = await addManagementContact(artist, { name: newContact.name, email: newContact.email, phone: newContact.phone, role: newContact.role || 'Management' }, existing.length)
+      setMgmtByArtist(prev => ({ ...prev, [artist]: [...(prev[artist] ?? []), c] }))
+      setNewContact({ name: '', email: '', phone: '', role: 'Management' })
+      setAddingContact(null)
+    } catch (e) { console.error('addContact:', e) }
+    setSavingContact(false)
   }
+
+  async function handleUpdateContact(id: string, artist: string) {
+    setSavingContact(true)
+    try {
+      await updateManagementContact(id, contactDraft)
+      setMgmtByArtist(prev => ({
+        ...prev,
+        [artist]: (prev[artist] ?? []).map(c => c.id === id ? { ...c, ...contactDraft } : c),
+      }))
+      setEditingContact(null)
+      setContactDraft({})
+    } catch (e) { console.error('updateContact:', e) }
+    setSavingContact(false)
+  }
+
+  async function handleDeleteContact(id: string, artist: string) {
+    await deleteManagementContact(id)
+    setMgmtByArtist(prev => ({ ...prev, [artist]: (prev[artist] ?? []).filter(c => c.id !== id) }))
+  }
+
+  async function handlePdfUpload(master: MasterRider, files: FileList | File[]) {
+    const pdfs = Array.from(files).filter(f => f.type.includes('pdf'))
+    if (!pdfs.length) return
+    setUploadingPdf(master.id)
+    try {
+      let uploadFile: File
+
+      if (pdfs.length === 1) {
+        uploadFile = pdfs[0]
+      } else {
+        // Merge multiple PDFs into one using pdf-lib
+        const merged = await PDFDocument.create()
+        for (const pdf of pdfs) {
+          const bytes = await pdf.arrayBuffer()
+          const doc = await PDFDocument.load(bytes, { ignoreEncryption: true })
+          const pages = await merged.copyPages(doc, doc.getPageIndices())
+          pages.forEach(p => merged.addPage(p))
+        }
+        const mergedBytes = await merged.save()
+        uploadFile = new File([new Uint8Array(mergedBytes)], 'merged-rider.pdf', { type: 'application/pdf' })
+      }
+
+      const slug = master.artist.toLowerCase().replace(/[^a-z0-9]/g, '-')
+      const path = `official/${slug}/${Date.now()}-rider.pdf`
+      const { error } = await supabase.storage.from('rider-pdfs').upload(path, uploadFile, { contentType: 'application/pdf', upsert: true })
+      if (error) throw error
+      const { data: { publicUrl } } = supabase.storage.from('rider-pdfs').getPublicUrl(path)
+      await saveMasterPdfUrl(master.id, publicUrl)
+      setPdfUrls(prev => ({ ...prev, [master.id]: publicUrl }))
+    } catch (e) { console.error(e) }
+    setUploadingPdf(null)
+  }
+
+  async function handlePdfDelete(master: MasterRider) {
+    await saveMasterPdfUrl(master.id, null)
+    setPdfUrls(prev => { const n = { ...prev }; delete n[master.id]; return n })
+  }
+
+  async function handleExtract(master: MasterRider) {
+    setExtractingPdf(master.id)
+    setExtractResults(prev => ({ ...prev, [master.id]: '' }))
+    try {
+      const res = await fetch(`/api/extract-master/${master.id}`, { method: 'POST' })
+      let data: any
+      try { data = await res.json() } catch { throw new Error('Server error — try again or check PDF size') }
+      if (!res.ok) throw new Error(data.error ?? 'Extraction failed')
+      setExtractResults(prev => ({ ...prev, [master.id]: `✓ Extracted ${data.extracted} items — saved as v${data.version}` }))
+      await load()
+    } catch (e: any) {
+      setExtractResults(prev => ({ ...prev, [master.id]: `✕ ${e.message}` }))
+    }
+    setExtractingPdf(null)
+  }
+
+  useEffect(() => { load() }, [load])
 
   function startEdit(master: MasterRider) {
     setEditing(master.artist)
@@ -138,55 +262,23 @@ export default function RiderLibrary() {
     setSaving(false)
   }
 
-  // Build display list: Supabase data OR fallback from templates
-  const displayList: Array<{ artist: string; version: string; id: string; items: LocalItem[]; updatedAt: string }> =
-    isConfigured
-      ? masters.map(m => ({ artist: m.artist, version: m.version, id: m.id, items: m.items as LocalItem[], updatedAt: m.updatedAt }))
-      : ARTIST_ROSTER
-          .filter(a => RIDER_TEMPLATES[a])
-          .map(a => ({
-            artist: a,
-            version: '1.0',
-            id: a,
-            updatedAt: '',
-            items: RIDER_TEMPLATES[a].map((t, idx) => ({
-              id: `${a}-${idx}`,
-              masterId: a,
-              category: t.category,
-              name: t.name,
-              quantity: t.quantity,
-              notes: t.notes,
-              sortOrder: idx,
-            })),
-          }))
-
-  const needsSeed = isConfigured && !loading && masters.length === 0
+  const displayList = masters.map(m => ({ artist: m.artist, version: m.version, id: m.id, items: m.items as LocalItem[], updatedAt: m.updatedAt }))
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+    <div className="min-h-screen bg-transparent">
+      <header className="bg-white border-b border-amber-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-5 py-4">
-          <button onClick={() => router.push('/')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-3 transition-colors">
+          <button onClick={() => router.push('/')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-white mb-3 transition-colors">
             <ArrowLeft size={15} /> Dashboard
           </button>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <BookOpen size={20} className="text-gray-400" />
+              <BookOpen size={20} className="text-amber-500" />
               <div>
                 <h1 className="text-xl font-black text-gray-900">Rider Library</h1>
                 <p className="text-xs text-gray-500">Master riders per artist — templates for every show</p>
               </div>
             </div>
-            {isConfigured && (
-              <button
-                onClick={handleSeed}
-                disabled={seeding}
-                className="flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 transition-colors disabled:opacity-40"
-              >
-                {seeding ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                {seeding ? 'Syncing…' : 'Sync from Templates'}
-              </button>
-            )}
           </div>
         </div>
       </header>
@@ -198,43 +290,34 @@ export default function RiderLibrary() {
           </div>
         )}
 
-        {needsSeed && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
-            <BookOpen size={32} className="text-amber-400 mx-auto mb-3" />
-            <h2 className="font-bold text-gray-900 mb-1">No master riders found</h2>
-            <p className="text-sm text-gray-500 mb-4">Click below to load all riders from the built-in templates.</p>
-            <button
-              onClick={handleSeed}
-              disabled={seeding}
-              className="bg-gray-900 text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-gray-700 transition-colors disabled:opacity-40 flex items-center gap-2 mx-auto"
-            >
-              {seeding ? <><Loader2 size={14} className="animate-spin" /> Seeding…</> : 'Load All Riders'}
-            </button>
-          </div>
-        )}
 
         {!loading && displayList.map(master => {
           const isOpen = expanded === master.artist
           const isEditing = editing === master.artist
           const grouped = groupByCategory(isEditing ? editItems : master.items)
           const totalItems = (isEditing ? editItems : master.items).length
-          const categories = Object.keys(grouped)
+          const categories = sortCategories(Object.keys(grouped))
+
+          const pdfUrl = pdfUrls[master.id] || OFFICIAL_RIDER_PDFS[master.artist]
+          const isUploading = uploadingPdf === master.id
+          const isExtracting = extractingPdf === master.id
+          const extractResult = extractResults[master.id]
 
           return (
-            <div key={master.artist} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div key={master.artist} className="bg-white rounded-2xl border border-amber-200 overflow-hidden">
               {/* Artist header row */}
               <div className="px-5 py-4 flex items-center justify-between gap-3">
                 <button
                   className="flex-1 flex items-center gap-3 text-left"
                   onClick={() => !isEditing && setExpanded(isOpen ? null : master.artist)}
                 >
-                  <ArtistAvatar artist={master.artist} size={40} rounded="rounded-full" />
+                  <ArtistAvatar artist={master.artist} size={104} rounded="rounded-full" />
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-black text-gray-900">{master.artist}</span>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">v{master.version}</span>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-gray-400">v{master.version}</span>
                     </div>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-500">
                       {totalItems} items · {categories.length} categories
                       {master.updatedAt ? ` · Updated ${new Date(master.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
                     </p>
@@ -245,37 +328,91 @@ export default function RiderLibrary() {
                   {!isEditing && isConfigured && (
                     <button
                       onClick={() => { setExpanded(master.artist); startEdit(masters.find(m => m.artist === master.artist)!) }}
-                      className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl border border-amber-400 text-amber-700 hover:bg-amber-50 transition-colors"
                     >
                       <Edit3 size={13} /> Edit
                     </button>
                   )}
                   {!isEditing && (
-                    <button onClick={() => setExpanded(isOpen ? null : master.artist)} className="text-gray-400 hover:text-gray-700 p-1">
+                    <button onClick={() => setExpanded(isOpen ? null : master.artist)} className="text-gray-500 hover:text-gray-900 p-1">
                       {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
                   )}
                 </div>
               </div>
 
+              {/* Official PDF bar */}
+              <div className="px-5 py-3 border-t border-amber-100 bg-amber-50">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <FileText size={15} className="text-amber-600 shrink-0" />
+                    <span className="text-xs font-bold text-gray-700">Official Rider PDF</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {pdfUrl ? (
+                      <>
+                        <a
+                          href={pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-gray-950 transition-colors shadow-sm"
+                        >
+                          <Download size={12} /> Download
+                        </a>
+                        {isConfigured && (
+                          <button
+                            onClick={() => handleExtract(master)}
+                            disabled={isExtracting}
+                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50"
+                          >
+                            {isExtracting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                            {isExtracting ? 'Reading PDF…' : 'Extract Items'}
+                          </button>
+                        )}
+                        {isConfigured && (
+                          <button
+                            onClick={() => handlePdfDelete(master)}
+                            className="text-xs text-red-400 hover:text-red-600 font-semibold transition-colors"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">No PDF uploaded yet</span>
+                    )}
+                    {isConfigured && (
+                      <label className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-400 text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {isUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                        {isUploading ? 'Uploading…' : pdfUrl ? 'Replace PDF' : 'Upload PDF(s)'}
+                        <input type="file" accept="application/pdf" multiple className="hidden" onChange={e => { if (e.target.files?.length) handlePdfUpload(master, e.target.files); e.target.value = '' }} />
+                      </label>
+                    )}
+                  </div>
+                </div>
+                {extractResult && (
+                  <p className={`text-xs font-bold mt-2 ${extractResult.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{extractResult}</p>
+                )}
+              </div>
+
               {/* Expanded items view / edit */}
               {(isOpen || isEditing) && (
-                <div className="border-t border-gray-100">
+                <div className="border-t border-amber-200">
                   {/* Edit mode toolbar */}
                   {isEditing && (
-                    <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 flex items-center justify-between gap-3">
-                      <span className="text-xs font-semibold text-amber-700">Editing — changes will save as v{nextVersion(master.version)}</span>
+                    <div className="px-5 py-3 bg-amber-900/30 border-b border-amber-800 flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold text-amber-400">Editing — changes will save as v{nextVersion(master.version)}</span>
                       <div className="flex gap-2">
                         <button
                           onClick={cancelEdit}
-                          className="flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+                          className="flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors"
                         >
                           <X size={13} /> Cancel
                         </button>
                         <button
                           onClick={() => saveEdits(masters.find(m => m.artist === master.artist)!)}
                           disabled={saving || !dirty}
-                          className="flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-gray-900 text-white hover:bg-gray-700 transition-colors disabled:opacity-40"
+                          className="flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-gray-950 transition-colors disabled:opacity-40"
                         >
                           {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                           {saving ? 'Saving…' : `Save v${nextVersion(master.version)}`}
@@ -285,21 +422,21 @@ export default function RiderLibrary() {
                   )}
 
                   {/* Categories */}
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-gray-800">
                     {categories.map(cat => (
                       <div key={cat}>
-                        <div className="px-5 py-2.5 bg-gray-50 flex items-center justify-between">
-                          <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">{cat}</span>
+                        <div className="px-5 py-2.5 bg-amber-50 flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">{cat}</span>
                           {isEditing && (
                             <button
                               onClick={() => addNewItem(master.id, cat)}
-                              className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+                              className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-white transition-colors"
                             >
                               <Plus size={12} /> Add item
                             </button>
                           )}
                         </div>
-                        <div className="divide-y divide-gray-50">
+                        <div className="divide-y divide-gray-800/50">
                           {grouped[cat].map(item => (
                             <div key={item.id} className="px-5 py-3">
                               {isEditing ? (
@@ -309,24 +446,24 @@ export default function RiderLibrary() {
                                       value={item.name}
                                       onChange={e => updateEditItem(item.id, 'name', e.target.value)}
                                       placeholder="Item name"
-                                      className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                                      className="text-sm bg-amber-50 border border-amber-200 text-gray-900 placeholder-slate-400 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500"
                                     />
                                     <input
                                       value={item.quantity}
                                       onChange={e => updateEditItem(item.id, 'quantity', e.target.value)}
                                       placeholder="Qty"
-                                      className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                                      className="text-sm bg-amber-50 border border-amber-200 text-gray-900 placeholder-slate-400 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500"
                                     />
                                     <input
                                       value={item.notes}
                                       onChange={e => updateEditItem(item.id, 'notes', e.target.value)}
                                       placeholder="Notes (optional)"
-                                      className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                                      className="text-sm bg-amber-50 border border-amber-200 text-gray-900 placeholder-slate-400 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500"
                                     />
                                   </div>
                                   <button
                                     onClick={() => removeEditItem(item.id)}
-                                    className="text-gray-300 hover:text-red-500 transition-colors p-1 mt-0.5"
+                                    className="text-gray-600 hover:text-red-400 transition-colors p-1 mt-0.5"
                                   >
                                     <Trash2 size={14} />
                                   </button>
@@ -359,12 +496,107 @@ export default function RiderLibrary() {
                   </div>
                 </div>
               )}
+
+              {/* Management Contacts section */}
+              {isOpen && (
+                <div className="border-t border-amber-100 px-5 py-3">
+                  <button
+                    onClick={() => setMgmtOpen(mgmtOpen === master.artist ? null : master.artist)}
+                    className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors w-full"
+                  >
+                    <Users size={12} />
+                    Management Contacts
+                    <span className="ml-1 bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                      {(mgmtByArtist[master.artist] ?? []).length}
+                    </span>
+                    {mgmtOpen === master.artist ? <ChevronUp size={12} className="ml-auto" /> : <ChevronDown size={12} className="ml-auto" />}
+                  </button>
+
+                  {mgmtOpen === master.artist && (
+                    <div className="mt-3 space-y-2">
+                      {(mgmtByArtist[master.artist] ?? []).map(c => (
+                        <div key={c.id} className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                          {editingContact === c.id ? (
+                            <div className="space-y-2">
+                              <input value={contactDraft.name ?? c.name} onChange={e => setContactDraft(d => ({ ...d, name: e.target.value }))}
+                                placeholder="Name" className="w-full text-sm border border-amber-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                              <input value={contactDraft.role ?? c.role} onChange={e => setContactDraft(d => ({ ...d, role: e.target.value }))}
+                                placeholder="Role" className="w-full text-sm border border-amber-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                              <input value={contactDraft.email ?? c.email} onChange={e => setContactDraft(d => ({ ...d, email: e.target.value }))}
+                                placeholder="Email" type="email" className="w-full text-sm border border-amber-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                              <input value={contactDraft.phone ?? c.phone} onChange={e => setContactDraft(d => ({ ...d, phone: e.target.value }))}
+                                placeholder="Phone" className="w-full text-sm border border-amber-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                              <div className="flex gap-2 pt-1">
+                                <button onClick={() => handleUpdateContact(c.id, master.artist)} disabled={savingContact}
+                                  className="flex items-center gap-1 text-xs font-bold bg-amber-500 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">
+                                  {savingContact ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Save
+                                </button>
+                                <button onClick={() => { setEditingContact(null); setContactDraft({}) }}
+                                  className="text-xs font-bold text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg border border-gray-200">
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-gray-900 truncate">{c.name}</p>
+                                <p className="text-xs text-amber-600 font-semibold">{c.role}</p>
+                                {c.email && <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5"><Mail size={10} />{c.email}</p>}
+                                {c.phone && <p className="text-xs text-gray-500 flex items-center gap-1"><Phone size={10} />{c.phone}</p>}
+                              </div>
+                              <div className="flex gap-1 shrink-0">
+                                <button onClick={() => { setEditingContact(c.id); setContactDraft({}) }}
+                                  className="p-1.5 rounded-lg hover:bg-amber-200 text-gray-400 hover:text-gray-700 transition-colors">
+                                  <Edit3 size={12} />
+                                </button>
+                                <button onClick={() => handleDeleteContact(c.id, master.artist)}
+                                  className="p-1.5 rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors">
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {addingContact === master.artist ? (
+                        <div className="bg-white border-2 border-amber-300 rounded-xl p-3 space-y-2">
+                          <input value={newContact.name} onChange={e => setNewContact(d => ({ ...d, name: e.target.value }))}
+                            placeholder="Full name *" className="w-full text-sm border border-amber-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                          <input value={newContact.role} onChange={e => setNewContact(d => ({ ...d, role: e.target.value }))}
+                            placeholder="Role (e.g. Management, Agent)" className="w-full text-sm border border-amber-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                          <input value={newContact.email} onChange={e => setNewContact(d => ({ ...d, email: e.target.value }))}
+                            placeholder="Email" type="email" className="w-full text-sm border border-amber-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                          <input value={newContact.phone} onChange={e => setNewContact(d => ({ ...d, phone: e.target.value }))}
+                            placeholder="Phone" className="w-full text-sm border border-amber-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                          <div className="flex gap-2 pt-1">
+                            <button onClick={() => handleSaveNewContact(master.artist)} disabled={savingContact || !newContact.name.trim()}
+                              className="flex items-center gap-1 text-xs font-bold bg-amber-500 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">
+                              {savingContact ? <Loader2 size={11} className="animate-spin" /> : <UserPlus size={11} />} Add Contact
+                            </button>
+                            <button onClick={() => { setAddingContact(null); setNewContact({ name: '', email: '', phone: '', role: 'Management' }) }}
+                              className="text-xs font-bold text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg border border-gray-200">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => setAddingContact(master.artist)}
+                          className="flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-800 py-1 transition-colors">
+                          <UserPlus size={12} /> Add Contact
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}
 
         {!loading && !isConfigured && (
-          <div className="text-xs text-center text-gray-400 pt-4">
+          <div className="text-xs text-center text-gray-600 pt-4">
             Supabase not connected — showing read-only templates. Connect Supabase to enable editing.
           </div>
         )}
@@ -381,11 +613,11 @@ function AddCategoryRow({ masterId, onAdd }: { masterId: string; onAdd: (cat: st
         value={value}
         onChange={e => setValue(e.target.value)}
         placeholder="New category name…"
-        className="flex-1 text-sm border border-dashed border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900"
+        className="flex-1 text-sm bg-amber-50 border border-dashed border-amber-200 text-gray-900 placeholder-slate-400 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500"
       />
       <button
         onClick={() => { if (value.trim()) { onAdd(value.trim()); setValue('') } }}
-        className="flex items-center gap-1 text-sm font-semibold px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+        className="flex items-center gap-1 text-sm font-semibold px-3 py-1.5 rounded-lg border border-amber-400 text-amber-700 hover:bg-amber-50 transition-colors"
       >
         <Plus size={13} /> Add Category
       </button>

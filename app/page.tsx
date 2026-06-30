@@ -14,7 +14,10 @@ import { supabase, isConfigured } from '@/lib/supabase'
 import NewShowModal from '@/app/components/NewShowModal'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
 import SyncDatesModal from '@/app/components/SyncDatesModal'
+import OnboardingGuide from '@/app/components/OnboardingGuide'
 import type { TourDate } from '@/app/api/sync-dates/route'
+
+const COMPANY_NAME = process.env.NEXT_PUBLIC_COMPANY_NAME ?? 'Blue Alley Touring'
 
 const STATUS_BORDER: Record<string, string> = {
   draft:     'border-l-gray-400',
@@ -124,7 +127,7 @@ function ShowCard({
 
   return (
     <div
-      className={`relative group bg-gray-900 rounded-2xl border border-gray-800 border-l-4 ${border} overflow-hidden transition-all duration-200 animate-slide-up
+      className={`relative group bg-white rounded-2xl border border-amber-200 border-l-4 ${border} overflow-hidden transition-all duration-200 animate-slide-up
         ${dragging ? 'ring-2 ring-amber-500 ring-offset-2 ring-offset-gray-950 scale-[1.02] shadow-2xl' : 'hover:shadow-xl hover:shadow-black/40 hover:-translate-y-0.5'}`}
       onDragOver={e => { e.preventDefault(); setDragging(true) }}
       onDragEnter={e => { e.preventDefault(); setDragging(true) }}
@@ -137,11 +140,11 @@ function ShowCard({
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`w-2 h-2 rounded-full shrink-0 ${dot} ${show.status === 'active' ? 'animate-pulse' : ''}`} />
             <span className={`text-xs font-black tracking-wider ${cfg.color}`}>{cfg.label.toUpperCase()}</span>
-            {hasIssues && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 border border-red-800">⚠ Attention</span>}
-            {show.buyerApprovedAt && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-800">✓ Received</span>}
+            {hasIssues && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">⚠ Attention</span>}
+            {show.buyerApprovedAt && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Received</span>}
           </div>
           {unread > 0 && (
-            <span className="flex items-center gap-1 text-xs font-black text-blue-400 bg-blue-900/40 px-2.5 py-1 rounded-full border border-blue-800">
+            <span className="flex items-center gap-1 text-xs font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
               <Bell size={10} /> {unread} new
             </span>
           )}
@@ -149,30 +152,30 @@ function ShowCard({
 
         <div className="flex items-start gap-3">
           <div className="group-hover:scale-105 transition-transform duration-200 shadow-md rounded-xl">
-            <ArtistAvatar artist={show.artist} size={48} />
+            <ArtistAvatar artist={show.artist} size={96} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-black text-white text-lg leading-tight">{show.artist}</div>
-            <div className="text-sm text-gray-400 truncate mt-0.5">{show.venue}</div>
+            <div className="font-black text-gray-900 text-lg leading-tight">{show.artist}</div>
+            <div className="text-sm text-gray-600 truncate mt-0.5">{show.venue}</div>
             <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
               <MapPin size={10} />
-              {show.city} · {new Date(show.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              {show.city} · {new Date(show.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </div>
           </div>
         </div>
 
         {total > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-800">
+          <div className="mt-4 pt-4 border-t border-amber-200">
             <div className="flex items-center justify-between mb-2">
               <div className="flex gap-3 text-xs font-semibold">
-                {counts.confirmed   > 0 && <span className="text-emerald-400">✓ {counts.confirmed}</span>}
-                {counts.pending     > 0 && <span className="text-amber-400">◷ {counts.pending}</span>}
-                {counts.unavailable > 0 && <span className="text-red-400">✕ {counts.unavailable}</span>}
-                {counts.substituted > 0 && <span className="text-blue-400">⇄ {counts.substituted}</span>}
+                {counts.confirmed   > 0 && <span className="text-emerald-600">✓ {counts.confirmed}</span>}
+                {counts.pending     > 0 && <span className="text-amber-600">◷ {counts.pending}</span>}
+                {counts.unavailable > 0 && <span className="text-red-600">✕ {counts.unavailable}</span>}
+                {counts.substituted > 0 && <span className="text-blue-600">⇄ {counts.substituted}</span>}
               </div>
               <span className="text-xs font-black text-gray-500">{pct}%</span>
             </div>
-            <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden">
               <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full fill-bar" style={{ width: `${pct}%` }} />
             </div>
           </div>
@@ -181,7 +184,7 @@ function ShowCard({
 
       {/* PDF sections panel */}
       {isConfigured && (
-        <div className="border-t border-gray-800 px-4 pb-4 pt-3 space-y-2">
+        <div className="border-t border-amber-200 px-4 pb-4 pt-3 space-y-2">
           {hasSections && sections.map(s => (
             <div key={s.id} className="flex items-center gap-2 group/row">
               {editingId === s.id ? (
@@ -191,7 +194,7 @@ function ShowCard({
                   onKeyDown={e => { if (e.key === 'Enter') saveLabel(s.id); if (e.key === 'Escape') setEditingId(null) }}
                   onBlur={() => saveLabel(s.id)}
                   autoFocus
-                  className="flex-1 text-xs bg-gray-800 border border-gray-700 text-white rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="flex-1 text-xs bg-white border border-amber-200 text-gray-900 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   onClick={e => e.stopPropagation()}
                 />
               ) : (
@@ -200,7 +203,7 @@ function ShowCard({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={e => e.stopPropagation()}
-                  className="flex-1 flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 truncate"
+                  className="flex-1 flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:text-amber-900 truncate"
                 >
                   <Download size={10} className="shrink-0" /> {s.label}
                 </a>
@@ -219,7 +222,7 @@ function ShowCard({
           <div className="flex items-center gap-2 pt-1">
             <button
               onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
-              className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-white hover:bg-gray-800 px-2.5 py-1.5 rounded-lg transition-all border border-dashed border-gray-700 hover:border-gray-500"
+              className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:text-amber-50 hover:bg-amber-50 px-2.5 py-1.5 rounded-lg transition-all border border-dashed border-amber-800/40 hover:border-amber-700"
             >
               <FileUp size={10} /> {hasSections ? 'Add PDF' : 'Attach Rider PDF'}
             </button>
@@ -229,7 +232,7 @@ function ShowCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={e => e.stopPropagation()}
-                className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-900/30 hover:bg-amber-900/50 border border-amber-800 px-2.5 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2.5 py-1.5 rounded-lg transition-colors"
               >
                 <Download size={10} /> Download All
               </a>
@@ -250,7 +253,7 @@ function ShowCard({
         </div>
       )}
       {uploading && (
-        <div className="absolute inset-0 bg-gray-950/80 rounded-2xl flex flex-col items-center justify-center gap-2">
+        <div className="absolute inset-0 bg-white/90 rounded-2xl flex flex-col items-center justify-center gap-2">
           <Loader2 size={24} className="animate-spin text-amber-400" />
           <span className="text-sm font-bold text-white">Uploading…</span>
         </div>
@@ -268,6 +271,7 @@ export default function Dashboard() {
   const [live, setLive]             = useState(false)
   const [showNewModal, setShowNewModal]   = useState(false)
   const [showSyncModal, setShowSyncModal] = useState(false)
+  const [showGuide, setShowGuide]         = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -321,17 +325,15 @@ export default function Dashboard() {
   const totalMessages = shows.flatMap(s => s.messages).filter(m => m.from === 'buyer').length
 
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen bg-transparent">
       {/* ── Header ── */}
       <header className="relative bg-gray-950 overflow-hidden">
         <div className="absolute inset-0 dot-grid" />
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900/60 via-transparent to-black/40 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/40 via-transparent to-black/20 pointer-events-none" />
 
         <div className="relative max-w-5xl mx-auto px-5 py-5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
-              <Zap size={20} className="text-gray-950" fill="currentColor" />
-            </div>
+            <img src="/logo.png" alt="RiderLink" className="w-12 h-12 rounded-xl shadow-lg shadow-amber-500/30 object-cover" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-black text-white tracking-tight">RiderLink</h1>
@@ -341,11 +343,18 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              <p className="text-xs font-bold text-amber-500 tracking-widest uppercase">Blue Alley Touring</p>
+              <p className="text-xs font-bold text-amber-500 tracking-widest uppercase">{COMPANY_NAME}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setShowGuide(true)}
+              className="flex items-center gap-2 text-sm font-bold px-3 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-all"
+              title="Getting started guide"
+            >
+              <span className="text-base leading-none">📌</span> Guide
+            </button>
             <button
               onClick={() => router.push('/riders')}
               className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-all"
@@ -371,26 +380,26 @@ export default function Dashboard() {
       <div className="max-w-5xl mx-auto px-5 py-8">
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 border-l-4 border-l-amber-500 p-5">
+          <div className="bg-white rounded-2xl border border-amber-200 border-l-4 border-l-amber-500 p-5">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={13} className="text-amber-500" />
               <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Active Shows</span>
             </div>
-            <div className="text-4xl font-black text-white">{loading ? '—' : activeShows}</div>
+            <div className="text-4xl font-black text-gray-900">{loading ? '—' : activeShows}</div>
           </div>
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 border-l-4 border-l-red-500 p-5">
+          <div className="bg-white rounded-2xl border border-amber-200 border-l-4 border-l-red-500 p-5">
             <div className="flex items-center gap-2 mb-2">
               <AlertCircle size={13} className="text-red-500" />
               <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Needs Attention</span>
             </div>
-            <div className={`text-4xl font-black ${totalIssues > 0 ? 'text-red-400' : 'text-white'}`}>{loading ? '—' : totalIssues}</div>
+            <div className={`text-4xl font-black ${totalIssues > 0 ? 'text-red-600' : 'text-gray-900'}`}>{loading ? '—' : totalIssues}</div>
           </div>
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 border-l-4 border-l-blue-500 p-5">
+          <div className="bg-white rounded-2xl border border-amber-200 border-l-4 border-l-blue-500 p-5">
             <div className="flex items-center gap-2 mb-2">
               <Bell size={13} className="text-blue-500" />
               <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Buyer Messages</span>
             </div>
-            <div className={`text-4xl font-black ${totalMessages > 0 ? 'text-blue-400' : 'text-white'}`}>{loading ? '—' : totalMessages}</div>
+            <div className={`text-4xl font-black ${totalMessages > 0 ? 'text-blue-600' : 'text-gray-900'}`}>{loading ? '—' : totalMessages}</div>
           </div>
         </div>
 
@@ -401,13 +410,13 @@ export default function Dashboard() {
               className={`text-sm font-black px-4 py-2 rounded-xl transition-all ${
                 filter === f
                   ? 'bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20'
-                  : 'bg-gray-900 border border-gray-800 text-gray-400 hover:border-gray-600 hover:text-white'
+                  : 'bg-white border border-amber-300 text-amber-800 hover:bg-amber-50'
               }`}>
               {f === 'all' ? 'All Shows' : f === 'active' ? '⚡ Active' : '⚠ Attention'}
             </button>
           ))}
           {loading && <Loader2 size={15} className="animate-spin text-gray-400 ml-1" />}
-          <span className="ml-auto text-xs font-semibold text-gray-400">
+          <span className="ml-auto text-xs font-semibold text-gray-500">
             {filtered.length} show{filtered.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -425,15 +434,16 @@ export default function Dashboard() {
             </div>
           ))}
           {!loading && filtered.length === 0 && (
-            <div className="col-span-2 text-center py-24 text-gray-300 animate-fade-in">
+            <div className="col-span-2 text-center py-24 text-gray-400 animate-fade-in">
               <Music2 size={36} className="mx-auto mb-3 opacity-40" />
-              <p className="font-black text-gray-500">No shows here</p>
-              <p className="text-sm mt-1 text-gray-400">Hit New Show to get started</p>
+              <p className="font-black text-gray-600">No shows here</p>
+              <p className="text-sm mt-1 text-gray-500">Hit New Show to get started</p>
             </div>
           )}
         </div>
       </div>
 
+      <OnboardingGuide forceOpen={showGuide} onClose={() => setShowGuide(false)} />
       {showNewModal && <NewShowModal onClose={() => setShowNewModal(false)} />}
       {showSyncModal && (
         <SyncDatesModal

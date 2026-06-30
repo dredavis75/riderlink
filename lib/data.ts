@@ -18,6 +18,24 @@ export interface Message {
   timestamp: string
 }
 
+export interface BuyerAttachment {
+  name: string
+  url: string
+}
+
+export interface DayOfShowContact {
+  name: string
+  phone: string
+  email: string
+}
+
+export interface DayOfShowContacts {
+  artistRelations: DayOfShowContact
+  headOfSecurity: DayOfShowContact
+  settlement: DayOfShowContact
+  productionManager: DayOfShowContact
+}
+
 export interface Show {
   id: string
   artist: string
@@ -33,6 +51,11 @@ export interface Show {
   buyerApprovedName?: string
   riderVersion?: string
   riderPdfUrl?: string
+  runOfShowText?: string
+  runOfShowPdfUrl?: string
+  curfew?: string
+  dayOfShowContacts?: DayOfShowContacts
+  buyerAttachments?: BuyerAttachment[]
 }
 
 export interface RiderPdfSection {
@@ -59,6 +82,7 @@ export interface MasterRider {
   artist: string
   version: string
   updatedAt: string
+  pdfUrl?: string
   items: MasterRiderItem[]
 }
 
@@ -170,22 +194,30 @@ export const MOCK_SHOWS: Show[] = [
 ]
 
 export const STATUS_CONFIG: Record<ItemStatus, { label: string; color: string; bg: string }> = {
-  pending:     { label: 'Pending',     color: 'text-amber-600',  bg: 'bg-amber-50 border-amber-200' },
-  confirmed:   { label: 'Confirmed',   color: 'text-green-600',  bg: 'bg-green-50 border-green-200' },
-  unavailable: { label: 'Unavailable', color: 'text-red-600',    bg: 'bg-red-50 border-red-200' },
-  substituted: { label: 'Substituted', color: 'text-blue-600',   bg: 'bg-blue-50 border-blue-200' },
+  pending:     { label: 'Pending',     color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-300' },
+  confirmed:   { label: 'Confirmed',   color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-300' },
+  unavailable: { label: 'Unavailable', color: 'text-red-700',     bg: 'bg-red-50 border-red-300' },
+  substituted: { label: 'Substituted', color: 'text-blue-700',    bg: 'bg-blue-50 border-blue-300' },
 }
 
 export const SHOW_STATUS_CONFIG = {
-  draft:     { label: 'Draft',     color: 'text-gray-500',  bg: 'bg-gray-100' },
-  sent:      { label: 'Sent',      color: 'text-amber-600', bg: 'bg-amber-100' },
-  active:    { label: 'Active',    color: 'text-blue-600',  bg: 'bg-blue-100' },
-  confirmed: { label: 'Confirmed', color: 'text-green-600', bg: 'bg-green-100' },
+  draft:     { label: 'Draft',     color: 'text-gray-500',    bg: 'bg-gray-100' },
+  sent:      { label: 'Sent',      color: 'text-amber-700',   bg: 'bg-amber-100' },
+  active:    { label: 'Active',    color: 'text-blue-700',    bg: 'bg-blue-100' },
+  confirmed: { label: 'Confirmed', color: 'text-emerald-700', bg: 'bg-emerald-100' },
 }
 
 export type RiderTemplate = { category: string; name: string; quantity: string; notes: string }
 
-export const ARTIST_ROSTER = ['SKRILLA', 'G Herbo', 'Keyshia Cole', 'Flo Milli', 'K. Michelle', 'RL', 'NEXT'] as const
+export type TeamMember = { name: string; email: string; phone: string; role: string }
+
+export const ARTIST_MANAGEMENT: Record<string, TeamMember[]> = {
+  'SKRILLA': [
+    { name: 'Jevon Edwards', email: 'jevon.edwards@gmail.com', phone: '267-243-6875', role: 'Management' },
+  ],
+}
+
+export const ARTIST_ROSTER = ['SKRILLA', 'G Herbo', 'Keyshia Cole', 'Flo Milli', 'K. Michelle', 'RL'] as const
 
 // Official rider PDFs served from /public/riders/ — keyed by artist name
 export const OFFICIAL_RIDER_PDFS: Record<string, string> = {

@@ -9,7 +9,6 @@ const ARTIST_COLORS: Record<string, string> = {
   'Flo Milli':   'bg-amber-400',
   'K. Michelle': 'bg-teal-500',
   'RL':          'bg-blue-500',
-  'NEXT':        'bg-sky-400',
 }
 
 function initials(name: string) {
