@@ -47,11 +47,12 @@ function mapShow(row: any): Show {
 
 // ── Shows ────────────────────────────────────────────────────────────────────
 
-export async function getShows(): Promise<Show[]> {
+export async function getShows(workspaceId = 'default'): Promise<Show[]> {
   if (!isConfigured) throw new Error('Supabase not configured')
   const { data: shows, error } = await supabase
     .from('shows')
     .select('*, rider_items(*), messages(*)')
+    .eq('workspace_id', workspaceId)
     .order('date', { ascending: true })
 
   if (error) throw error
@@ -71,7 +72,7 @@ export async function getShow(id: string): Promise<Show | null> {
   return mapShow(data)
 }
 
-export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages'> & { items: Omit<RiderItem, 'id'>[] }): Promise<string> {
+export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages'> & { items: Omit<RiderItem, 'id'>[] }, workspaceId = 'default'): Promise<string> {
   const { data, error } = await supabase
     .from('shows')
     .insert({
@@ -82,6 +83,7 @@ export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages'> &
       buyer_name: show.buyerName,
       buyer_email: show.buyerEmail,
       status: show.status,
+      workspace_id: workspaceId,
     })
     .select('id')
     .single()
@@ -96,6 +98,7 @@ export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages'> &
       .from('rider_masters')
       .select('id, rider_master_items(*)')
       .eq('artist', show.artist)
+      .eq('workspace_id', workspaceId)
       .single()
 
     if (master?.rider_master_items?.length) {
@@ -230,10 +233,11 @@ function mapMasterRider(row: any): MasterRider {
   }
 }
 
-export async function getRiderMasters(): Promise<MasterRider[]> {
+export async function getRiderMasters(workspaceId = 'default'): Promise<MasterRider[]> {
   const { data, error } = await supabase
     .from('rider_masters')
     .select('*, rider_master_items(*)')
+    .eq('workspace_id', workspaceId)
     .order('artist')
   if (error) throw error
   return (data ?? []).map(mapMasterRider)
@@ -249,12 +253,13 @@ export async function getRiderMaster(artist: string): Promise<MasterRider | null
   return mapMasterRider(data)
 }
 
-export async function seedRiderMasters(templates: Record<string, RiderTemplate[]>): Promise<void> {
+export async function seedRiderMasters(templates: Record<string, RiderTemplate[]>, workspaceId = 'default'): Promise<void> {
   for (const [artist, items] of Object.entries(templates)) {
     const { data: existing } = await supabase
       .from('rider_masters')
       .select('id')
       .eq('artist', artist)
+      .eq('workspace_id', workspaceId)
       .single()
 
     let masterId: string
@@ -263,7 +268,7 @@ export async function seedRiderMasters(templates: Record<string, RiderTemplate[]
     } else {
       const { data, error } = await supabase
         .from('rider_masters')
-        .insert({ artist, version: '1.0' })
+        .insert({ artist, version: '1.0', workspace_id: workspaceId })
         .select('id')
         .single()
       if (error || !data) continue
@@ -462,10 +467,11 @@ export async function getManagementContacts(artist: string): Promise<ManagementC
   return (data ?? []).map(mapContact)
 }
 
-export async function getAllManagementContacts(): Promise<Record<string, ManagementContact[]>> {
+export async function getAllManagementContacts(workspaceId = 'default'): Promise<Record<string, ManagementContact[]>> {
   const { data } = await supabase
     .from('artist_management')
     .select('*')
+    .eq('workspace_id', workspaceId)
     .order('sort_order')
   const out: Record<string, ManagementContact[]> = {}
   for (const row of data ?? []) {
@@ -479,11 +485,12 @@ export async function getAllManagementContacts(): Promise<Record<string, Managem
 export async function addManagementContact(
   artist: string,
   contact: Omit<ManagementContact, 'id' | 'artist' | 'sortOrder'>,
-  sortOrder: number
+  sortOrder: number,
+  workspaceId = 'default'
 ): Promise<ManagementContact> {
   const { data, error } = await supabase
     .from('artist_management')
-    .insert({ artist, ...contact, sort_order: sortOrder })
+    .insert({ artist, ...contact, sort_order: sortOrder, workspace_id: workspaceId })
     .select()
     .single()
   if (error || !data) throw error
@@ -500,4 +507,33 @@ export async function updateManagementContact(
 
 export async function deleteManagementContact(id: string): Promise<void> {
   await supabase.from('artist_management').delete().eq('id', id)
+}
+
+// ── Community Photos ──────────────────────────────────────────────────────────
+
+export interface CommunityPhoto {
+  id: string
+  keyword: string
+  url: string
+  uploadedBy: string
+}
+
+export async function getCommunityPhotos(): Promise<CommunityPhoto[]> {
+  const { data } = await supabase
+    .from('community_photos')
+    .select('*')
+    .order('created_at', { ascending: false })
+  return (data ?? []).map(row => ({
+    id: row.id,
+    keyword: row.keyword,
+    url: row.url,
+    uploadedBy: row.workspace_id ?? '',
+  }))
+}
+
+// ── Workspaces ────────────────────────────────────────────────────────────────
+
+export async function getWorkspace(id: string): Promise<{ companyName: string } | null> {
+  const { data } = await supabase.from('workspaces').select('company_name').eq('id', id).single()
+  return data ? { companyName: data.company_name } : null
 }

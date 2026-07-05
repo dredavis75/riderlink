@@ -42,7 +42,7 @@ function formatDate(d: string) {
 function buildEmail(payload: NotifyPayload): { subject: string; html: string } {
   const showLine = `${payload.artistName} @ ${payload.venue}, ${payload.city}`
   const dateStr = formatDate(payload.date)
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://riderlink.vercel.app'
   const showUrl = `${appUrl}/show/${payload.showId}`
 
   if (payload.type === 'day_of_show_submitted') {
@@ -189,7 +189,7 @@ function buildEmail(payload: NotifyPayload): { subject: string; html: string } {
 
 function buildSms(payload: NotifyPayload): string {
   const show = `${payload.artistName} @ ${payload.venue}`
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://riderlink.vercel.app'
   const link = `${appUrl}/show/${payload.showId}`
 
   if (payload.type === 'day_of_show_submitted') {

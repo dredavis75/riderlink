@@ -8,6 +8,7 @@ import { createShow } from '@/lib/db'
 
 interface Props {
   onClose: () => void
+  workspaceId?: string
 }
 
 interface Prediction {
@@ -18,7 +19,7 @@ interface Prediction {
 
 const STEPS = ['Details', 'Rider'] as const
 
-export default function NewShowModal({ onClose }: Props) {
+export default function NewShowModal({ onClose, workspaceId = 'default' }: Props) {
   const router = useRouter()
   const [step, setStep] = useState<0 | 1>(0)
   const [saving, setSaving] = useState(false)
@@ -160,7 +161,7 @@ export default function NewShowModal({ onClose }: Props) {
           status: 'pending' as const,
           buyerNote: '',
         })),
-      })
+      }, workspaceId)
       router.push(`/show/${id}`)
       onClose()
     } catch (e: any) {

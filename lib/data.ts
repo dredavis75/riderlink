@@ -44,7 +44,7 @@ export interface Show {
   date: string
   buyerName: string
   buyerEmail: string
-  status: 'draft' | 'sent' | 'active' | 'confirmed'
+  status: 'draft' | 'sent' | 'active' | 'confirmed' | 'postponed' | 'cancelled'
   items: RiderItem[]
   messages: Message[]
   buyerApprovedAt?: string
@@ -205,6 +205,8 @@ export const SHOW_STATUS_CONFIG = {
   sent:      { label: 'Sent',      color: 'text-amber-700',   bg: 'bg-amber-100' },
   active:    { label: 'Active',    color: 'text-blue-700',    bg: 'bg-blue-100' },
   confirmed: { label: 'Confirmed', color: 'text-emerald-700', bg: 'bg-emerald-100' },
+  postponed: { label: 'Postponed', color: 'text-orange-700',  bg: 'bg-orange-100' },
+  cancelled: { label: 'Cancelled', color: 'text-red-700',     bg: 'bg-red-100' },
 }
 
 export type RiderTemplate = { category: string; name: string; quantity: string; notes: string }

@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, ChevronDown, ChevronUp, Edit3, Check, X,
-  Plus, Trash2, Save, Loader2, BookOpen, Download, Upload, FileText, Sparkles, UserPlus, Phone, Mail, Users,
+  Plus, Trash2, Save, Loader2, BookOpen, Download, Upload, FileText, Sparkles, UserPlus, Phone, Mail, Users, ImagePlus,
 } from 'lucide-react'
 import {
   ARTIST_ROSTER, OFFICIAL_RIDER_PDFS, type MasterRider, type MasterRiderItem,
@@ -15,6 +15,7 @@ import {
   getAllManagementContacts, addManagementContact, updateManagementContact, deleteManagementContact,
   type ManagementContact,
 } from '@/lib/db'
+import { getWorkspaceId } from '@/lib/workspace'
 import { supabase } from '@/lib/supabase'
 import { PDFDocument } from 'pdf-lib'
 import { isConfigured } from '@/lib/supabase'
@@ -68,7 +69,7 @@ export default function RiderLibrary() {
   const [masters, setMasters] = useState<MasterRider[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [editing, setEditing] = useState<string | null>(null) // artist being edited
+  const [editing, setEditing] = useState<string | null>(null)
   const [editItems, setEditItems] = useState<LocalItem[]>([])
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -83,18 +84,26 @@ export default function RiderLibrary() {
   const [addingContact, setAddingContact] = useState<string | null>(null)
   const [newContact, setNewContact] = useState({ name: '', email: '', phone: '', role: 'Management' })
   const [savingContact, setSavingContact] = useState(false)
+  const [workspaceId, setWsId] = useState('default')
+  // Photo upload state
+  const [photoOpen, setPhotoOpen] = useState(false)
+  const [photoKeyword, setPhotoKeyword] = useState('')
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoResult, setPhotoResult] = useState<string | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (wsId: string) => {
     if (!isConfigured) { setLoading(false); return }
     try {
-      const data = await getRiderMasters()
+      const data = await getRiderMasters(wsId)
       setMasters(data)
       const urls: Record<string, string> = {}
       for (const m of data) { if (m.pdfUrl) urls[m.id] = m.pdfUrl }
       setPdfUrls(urls)
     } catch {}
     try {
-      const all = await getAllManagementContacts()
+      const all = await getAllManagementContacts(wsId)
       setMgmtByArtist(all)
     } catch (e) { console.error('mgmt load:', e) }
     setLoading(false)
@@ -105,12 +114,33 @@ export default function RiderLibrary() {
     setSavingContact(true)
     try {
       const existing = mgmtByArtist[artist] ?? []
-      const c = await addManagementContact(artist, { name: newContact.name, email: newContact.email, phone: newContact.phone, role: newContact.role || 'Management' }, existing.length)
+      const c = await addManagementContact(artist, { name: newContact.name, email: newContact.email, phone: newContact.phone, role: newContact.role || 'Management' }, existing.length, workspaceId)
       setMgmtByArtist(prev => ({ ...prev, [artist]: [...(prev[artist] ?? []), c] }))
       setNewContact({ name: '', email: '', phone: '', role: 'Management' })
       setAddingContact(null)
     } catch (e) { console.error('addContact:', e) }
     setSavingContact(false)
+  }
+
+  async function handleUploadPhoto() {
+    if (!photoFile || !photoKeyword.trim()) return
+    setUploadingPhoto(true)
+    setPhotoResult(null)
+    try {
+      const form = new FormData()
+      form.append('file', photoFile)
+      form.append('keyword', photoKeyword.trim().toLowerCase())
+      form.append('workspaceId', workspaceId)
+      const res = await fetch('/api/upload-photo', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Upload failed')
+      setPhotoResult('✓ Photo added to community library')
+      setPhotoKeyword('')
+      setPhotoFile(null)
+    } catch (e: any) {
+      setPhotoResult('✕ ' + e.message)
+    }
+    setUploadingPhoto(false)
   }
 
   async function handleUpdateContact(id: string, artist: string) {
@@ -179,14 +209,18 @@ export default function RiderLibrary() {
       try { data = await res.json() } catch { throw new Error('Server error — try again or check PDF size') }
       if (!res.ok) throw new Error(data.error ?? 'Extraction failed')
       setExtractResults(prev => ({ ...prev, [master.id]: `✓ Extracted ${data.extracted} items — saved as v${data.version}` }))
-      await load()
+      await load(workspaceId)
     } catch (e: any) {
       setExtractResults(prev => ({ ...prev, [master.id]: `✕ ${e.message}` }))
     }
     setExtractingPdf(null)
   }
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const wsId = getWorkspaceId() ?? 'default'
+    setWsId(wsId)
+    load(wsId)
+  }, [load])
 
   function startEdit(master: MasterRider) {
     setEditing(master.artist)
@@ -253,7 +287,7 @@ export default function RiderLibrary() {
 
       const newVer = nextVersion(master.version)
       await bumpMasterVersion(master.id, newVer)
-      await load()
+      await load(workspaceId)
       setEditing(null)
       setDirty(false)
     } catch (e) {
@@ -279,6 +313,10 @@ export default function RiderLibrary() {
                 <p className="text-xs text-gray-500">Master riders per artist — templates for every show</p>
               </div>
             </div>
+            <button onClick={() => { setPhotoOpen(true); setPhotoResult(null) }}
+              className="flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-200 transition-all">
+              <ImagePlus size={14} /> Add Photo
+            </button>
           </div>
         </div>
       </header>
@@ -601,6 +639,83 @@ export default function RiderLibrary() {
           </div>
         )}
       </div>
+
+      {/* Photo upload modal */}
+      {photoOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-base font-black text-gray-900">Add to Photo Library</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Available to everyone in the community</p>
+              </div>
+              <button onClick={() => setPhotoOpen(false)} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                <X size={16} className="text-gray-500" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
+                  What is this a photo of? <span className="text-amber-500">*</span>
+                </label>
+                <input
+                  value={photoKeyword}
+                  onChange={e => setPhotoKeyword(e.target.value)}
+                  placeholder="e.g. sparkling water, protein bar, gaming chair"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-1">This becomes the keyword that matches rider items</p>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
+                  Photo <span className="text-amber-500">*</span>
+                </label>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => setPhotoFile(e.target.files?.[0] ?? null)}
+                />
+                <button
+                  onClick={() => photoInputRef.current?.click()}
+                  className="w-full border-2 border-dashed border-gray-200 hover:border-amber-400 rounded-xl py-4 text-center transition-colors group"
+                >
+                  {photoFile ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-8 h-8 rounded-lg overflow-hidden">
+                        <img src={URL.createObjectURL(photoFile)} className="w-full h-full object-cover" alt="" />
+                      </div>
+                      <span className="text-sm text-gray-700 font-medium truncate max-w-40">{photoFile.name}</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1">
+                      <ImagePlus size={20} className="text-gray-300 group-hover:text-amber-500 transition-colors" />
+                      <span className="text-xs text-gray-400">Click to choose photo</span>
+                    </div>
+                  )}
+                </button>
+              </div>
+
+              {photoResult && (
+                <p className={`text-xs font-medium ${photoResult.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {photoResult}
+                </p>
+              )}
+
+              <button
+                onClick={handleUploadPhoto}
+                disabled={uploadingPhoto || !photoFile || !photoKeyword.trim()}
+                className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-gray-950 font-black text-sm py-3 rounded-xl transition-all"
+              >
+                {uploadingPhoto ? <Loader2 size={15} className="animate-spin" /> : <><Upload size={15} /> Upload to Library</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

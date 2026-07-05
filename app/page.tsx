@@ -6,24 +6,29 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   MapPin, AlertCircle, Bell, Plus, TrendingUp,
-  Loader2, BookOpen, Zap, Music2, Download, FileUp, Trash2, Pencil, RefreshCw,
+  Loader2, BookOpen, Zap, Music2, Download, FileUp, Trash2, Pencil, RefreshCw, LogOut,
+  XCircle, PauseCircle, X,
 } from 'lucide-react'
 import { MOCK_SHOWS, SHOW_STATUS_CONFIG, type Show, type RiderPdfSection } from '@/lib/data'
-import { getShows, subscribeToAllShows, getSectionsForShows, addSection, deleteSection, updateSectionLabel, createShow } from '@/lib/db'
+import { getShows, subscribeToAllShows, getSectionsForShows, addSection, deleteSection, updateSectionLabel, createShow, updateShowStatus } from '@/lib/db'
 import { supabase, isConfigured } from '@/lib/supabase'
 import NewShowModal from '@/app/components/NewShowModal'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
 import SyncDatesModal from '@/app/components/SyncDatesModal'
 import OnboardingGuide from '@/app/components/OnboardingGuide'
+import { getWorkspaceId, clearWorkspace } from '@/lib/workspace'
+import { getWorkspace } from '@/lib/db'
 import type { TourDate } from '@/app/api/sync-dates/route'
 
-const COMPANY_NAME = process.env.NEXT_PUBLIC_COMPANY_NAME ?? 'Blue Alley Touring'
+const DEFAULT_COMPANY = process.env.NEXT_PUBLIC_COMPANY_NAME ?? 'Blue Alley Touring'
 
 const STATUS_BORDER: Record<string, string> = {
   draft:     'border-l-gray-400',
   sent:      'border-l-blue-500',
   active:    'border-l-amber-500',
   confirmed: 'border-l-emerald-500',
+  postponed: 'border-l-orange-500',
+  cancelled: 'border-l-red-500',
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -31,6 +36,8 @@ const STATUS_DOT: Record<string, string> = {
   sent:      'bg-blue-500',
   active:    'bg-amber-500',
   confirmed: 'bg-emerald-500',
+  postponed: 'bg-orange-500',
+  cancelled: 'bg-red-500',
 }
 
 function statusCounts(show: Show) {
@@ -70,11 +77,13 @@ function ShowCard({
   sections,
   onClick,
   onSectionsChanged,
+  onStatusChanged,
 }: {
   show: Show
   sections: RiderPdfSection[]
   onClick: () => void
   onSectionsChanged: (showId: string, sections: RiderPdfSection[]) => void
+  onStatusChanged: (showId: string, status: Show['status']) => void
 }) {
   const counts    = statusCounts(show)
   const hasIssues = counts.unavailable > 0 || counts.substituted > 0
@@ -91,6 +100,10 @@ function ShowCard({
   const [editingId, setEditingId]   = useState<string | null>(null)
   const [editLabel, setEditLabel]   = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const [statusModal, setStatusModal]   = useState<'cancelled' | 'postponed' | null>(null)
+  const [statusReason, setStatusReason] = useState('')
+  const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [statusMsg, setStatusMsg]       = useState<string | null>(null)
 
   const hasSections = sections.length > 0
   const mergeUrl = `/api/merge-rider/${show.id}`
@@ -123,6 +136,33 @@ function ShowCard({
     await updateSectionLabel(id, editLabel)
     onSectionsChanged(show.id, sections.map(s => s.id === id ? { ...s, label: editLabel } : s))
     setEditingId(null)
+  }
+
+  async function handleConfirmStatusChange() {
+    if (!statusModal) return
+    setUpdatingStatus(true)
+    try {
+      await updateShowStatus(show.id, statusModal)
+      onStatusChanged(show.id, statusModal)
+      if (show.buyerEmail) {
+        fetch('/api/notify-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            showId: show.id, status: statusModal, artistName: show.artist,
+            venue: show.venue, city: show.city, date: show.date,
+            buyerName: show.buyerName, buyerEmail: show.buyerEmail,
+            reason: statusReason.trim() || undefined,
+          }),
+        }).catch(() => {})
+      }
+      setStatusMsg(`✓ Marked as ${statusModal}${show.buyerEmail ? ' — buyer notified' : ''}`)
+      setStatusModal(null)
+      setStatusReason('')
+    } catch (e: any) {
+      setStatusMsg('✕ ' + e.message)
+    }
+    setUpdatingStatus(false)
   }
 
   return (
@@ -219,6 +259,29 @@ function ShowCard({
             </div>
           ))}
 
+          {show.status !== 'postponed' && show.status !== 'cancelled' ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={e => { e.stopPropagation(); setStatusModal('postponed'); setStatusMsg(null) }}
+                className="flex items-center gap-1.5 text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2.5 py-1.5 rounded-lg transition-colors"
+              >
+                <PauseCircle size={10} /> Postpone
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); setStatusModal('cancelled'); setStatusMsg(null) }}
+                className="flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1.5 rounded-lg transition-colors"
+              >
+                <XCircle size={10} /> Cancel Show
+              </button>
+            </div>
+          ) : (
+            <div className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg border w-fit ${show.status === 'cancelled' ? 'text-red-700 bg-red-50 border-red-200' : 'text-orange-700 bg-orange-50 border-orange-200'}`}>
+              {show.status === 'cancelled' ? <XCircle size={10} /> : <PauseCircle size={10} />}
+              {show.status === 'cancelled' ? 'Cancelled' : 'Postponed'}
+            </div>
+          )}
+          {statusMsg && <p className={`text-xs font-semibold ${statusMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{statusMsg}</p>}
+
           <div className="flex items-center gap-2 pt-1">
             <button
               onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
@@ -258,6 +321,53 @@ function ShowCard({
           <span className="text-sm font-bold text-white">Uploading…</span>
         </div>
       )}
+
+      {/* Cancel / Postpone confirm modal */}
+      {statusModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-base font-black text-gray-900">
+                {statusModal === 'cancelled' ? 'Cancel this show?' : 'Postpone this show?'}
+              </h3>
+              <button onClick={() => { setStatusModal(null); setStatusReason('') }} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                <X size={16} className="text-gray-500" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              {show.buyerEmail
+                ? `${show.buyerName || 'The buyer'} (${show.buyerEmail}) will be emailed automatically.`
+                : 'No buyer email on file — this will only update the status.'}
+            </p>
+
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
+              Reason <span className="text-gray-400 font-normal normal-case">(optional, included in buyer email)</span>
+            </label>
+            <textarea
+              value={statusReason}
+              onChange={e => setStatusReason(e.target.value)}
+              placeholder={statusModal === 'cancelled' ? 'e.g. Venue conflict' : 'e.g. New date TBD, artist illness'}
+              rows={3}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 transition-all mb-4 resize-none"
+            />
+
+            <div className="flex gap-2">
+              <button onClick={() => { setStatusModal(null); setStatusReason('') }}
+                className="flex-1 text-sm font-bold px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">
+                Never mind
+              </button>
+              <button onClick={handleConfirmStatusChange} disabled={updatingStatus}
+                className={`flex-1 flex items-center justify-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl text-white disabled:opacity-50 transition-colors ${statusModal === 'cancelled' ? 'bg-red-600 hover:bg-red-500' : 'bg-orange-500 hover:bg-orange-400'}`}>
+                {updatingStatus ? <Loader2 size={14} className="animate-spin" /> : (statusModal === 'cancelled' ? <XCircle size={14} /> : <PauseCircle size={14} />)}
+                {statusModal === 'cancelled' ? 'Cancel Show' : 'Postpone Show'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -272,10 +382,12 @@ export default function Dashboard() {
   const [showNewModal, setShowNewModal]   = useState(false)
   const [showSyncModal, setShowSyncModal] = useState(false)
   const [showGuide, setShowGuide]         = useState(false)
+  const [workspaceId, setWsId]           = useState<string>('default')
+  const [companyName, setCompanyName]    = useState(DEFAULT_COMPANY)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (wsId: string) => {
     try {
-      const data = await getShows()
+      const data = await getShows(wsId)
       setShows(data)
       setLive(true)
       if (data.length) {
@@ -290,13 +402,22 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    load()
-    const unsub = subscribeToAllShows(load)
+    const wsId = getWorkspaceId()
+    if (!wsId) { router.push('/login'); return }
+    setWsId(wsId)
+    load(wsId)
+    // Load workspace name
+    getWorkspace(wsId).then(ws => { if (ws) setCompanyName(ws.companyName) })
+    const unsub = subscribeToAllShows(() => load(wsId))
     return unsub
-  }, [load])
+  }, [load, router])
 
   function handleSectionsChanged(showId: string, next: RiderPdfSection[]) {
     setSections(prev => ({ ...prev, [showId]: next }))
+  }
+
+  function handleStatusChanged(showId: string, status: Show['status']) {
+    setShows(prev => prev.map(s => s.id === showId ? { ...s, status } : s))
   }
 
   async function handleImportDates(dates: TourDate[]) {
@@ -312,7 +433,7 @@ export default function Dashboard() {
         items: [],
       })
     }
-    await load()
+    await load(workspaceId)
   }
 
   const filtered      = shows.filter(s => {
@@ -343,7 +464,7 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              <p className="text-xs font-bold text-amber-500 tracking-widest uppercase">{COMPANY_NAME}</p>
+              <p className="text-xs font-bold text-amber-500 tracking-widest uppercase">{companyName}</p>
             </div>
           </div>
 
@@ -354,6 +475,13 @@ export default function Dashboard() {
               title="Getting started guide"
             >
               <span className="text-base leading-none">📌</span> Guide
+            </button>
+            <button
+              onClick={async () => { clearWorkspace(); await supabase.auth.signOut(); router.push('/login') }}
+              className="flex items-center gap-2 text-sm font-bold px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 border border-white/10 transition-all"
+              title="Sign out"
+            >
+              <LogOut size={14} />
             </button>
             <button
               onClick={() => router.push('/riders')}
@@ -430,6 +558,7 @@ export default function Dashboard() {
                 sections={sections[show.id] ?? []}
                 onClick={() => router.push(`/show/${show.id}`)}
                 onSectionsChanged={handleSectionsChanged}
+                onStatusChanged={handleStatusChanged}
               />
             </div>
           ))}
@@ -444,7 +573,7 @@ export default function Dashboard() {
       </div>
 
       <OnboardingGuide forceOpen={showGuide} onClose={() => setShowGuide(false)} />
-      {showNewModal && <NewShowModal onClose={() => setShowNewModal(false)} />}
+      {showNewModal && <NewShowModal workspaceId={workspaceId} onClose={() => setShowNewModal(false)} />}
       {showSyncModal && (
         <SyncDatesModal
           onClose={() => setShowSyncModal(false)}
