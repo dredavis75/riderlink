@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Send, Copy, CheckCircle2, AlertCircle,
   MessageSquare, Edit3, ExternalLink, Loader2, Zap, Download, Sparkles, Trash2,
-  Calendar, Phone, Mail, Shield, Music, DollarSign, Wrench, FileText, Clock, Users, XCircle, PauseCircle, X,
+  Calendar, Phone, Mail, Shield, Music, DollarSign, Wrench, FileText, Clock, Users, XCircle, PauseCircle, X, RotateCcw,
 } from 'lucide-react'
 import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
 import { getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, getAllManagementContacts, type ManagementContact } from '@/lib/db'
@@ -85,7 +85,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [inviting, setInviting]       = useState(false)
   const [inviteResult, setInviteResult] = useState<string | null>(null)
   const [mgmtContacts, setMgmtContacts] = useState<ManagementContact[]>([])
-  const [statusModal, setStatusModal] = useState<'cancelled' | 'postponed' | null>(null)
+  const [statusModal, setStatusModal] = useState<'cancelled' | 'postponed' | 'restore' | null>(null)
   const [statusReason, setStatusReason] = useState('')
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
@@ -229,11 +229,12 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
 
   async function handleConfirmStatusChange() {
     if (!show || !statusModal) return
+    const targetStatus: Show['status'] = statusModal === 'restore' ? 'active' : statusModal
     setUpdatingStatus(true)
     try {
-      await updateShowStatus(show.id, statusModal)
-      setShow(p => p ? { ...p, status: statusModal } : p)
-      if (show.buyerEmail) {
+      await updateShowStatus(show.id, targetStatus)
+      setShow(p => p ? { ...p, status: targetStatus } : p)
+      if (statusModal === 'cancelled' || statusModal === 'postponed') {
         fetch('/api/notify-status', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -244,8 +245,10 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
             reason: statusReason.trim() || undefined,
           }),
         }).catch(() => {})
+        setStatusMsg(`✓ Show marked as ${statusModal} — confirmation email sent`)
+      } else {
+        setStatusMsg('✓ Show restored to Active')
       }
-      setStatusMsg(`✓ Show marked as ${statusModal}${show.buyerEmail ? ' — buyer notified' : ''}`)
       setStatusModal(null)
       setStatusReason('')
     } catch (e: any) {
@@ -336,10 +339,20 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                   </button>
                 </div>
               )}
-              {(show.status === 'postponed' || show.status === 'cancelled') && (
-                <div className={`flex items-center gap-2 text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border ${show.status === 'cancelled' ? 'bg-red-500/15 text-red-300 border-red-400/30' : 'bg-orange-500/15 text-orange-300 border-orange-400/30'}`}>
-                  {show.status === 'cancelled' ? <XCircle size={13} /> : <PauseCircle size={13} />}
-                  {show.status === 'cancelled' ? 'Cancelled' : 'Postponed'}
+              {show.status === 'postponed' && (
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border bg-orange-500/15 text-orange-300 border-orange-400/30">
+                  <PauseCircle size={13} /> Postponed
+                </div>
+              )}
+              {show.status === 'cancelled' && (
+                <div className="flex gap-2">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border bg-red-500/15 text-red-300 border-red-400/30">
+                    <XCircle size={13} /> Cancelled
+                  </div>
+                  <button onClick={() => { setStatusModal('restore'); setStatusMsg(null) }}
+                    className="flex-1 flex items-center justify-center gap-2 text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 transition-all">
+                    <RotateCcw size={13} /> Restore Show
+                  </button>
                 </div>
               )}
               {statusMsg && <p className={`text-xs font-semibold ${statusMsg.startsWith('✓') ? 'text-emerald-300' : 'text-red-300'}`}>{statusMsg}</p>}
@@ -734,34 +747,46 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
         )}
       </div>
 
-      {/* Cancel / Postpone confirm modal */}
-      {statusModal && (
+      {/* Cancel / Postpone / Restore confirm modal */}
+      {statusModal && show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-base font-black text-gray-900">
-                {statusModal === 'cancelled' ? 'Cancel this show?' : 'Postpone this show?'}
+                {statusModal === 'cancelled' ? 'Are you sure you want to cancel this show?'
+                  : statusModal === 'postponed' ? 'Are you sure you want to postpone this show?'
+                  : 'Restore this show?'}
               </h3>
-              <button onClick={() => { setStatusModal(null); setStatusReason('') }} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+              <button onClick={() => { setStatusModal(null); setStatusReason('') }} className="p-1 rounded-lg hover:bg-gray-100 transition-colors shrink-0">
                 <X size={16} className="text-gray-500" />
               </button>
             </div>
             <p className="text-xs text-gray-500 mb-4">
-              {show?.buyerEmail
-                ? `${show.buyerName || 'The buyer'} (${show.buyerEmail}) will be emailed automatically.`
-                : 'No buyer email on file — this will only update the status.'}
+              {statusModal === 'cancelled'
+                ? 'This is a fail-safe to prevent accidental cancellations — the show will move to Archived on your dashboard. You can restore it later if plans change.'
+                : statusModal === 'postponed'
+                ? 'This is a fail-safe to prevent accidental postponements — the show stays on your dashboard marked as postponed.'
+                : 'This brings the show back to Active status in your main list so you can pick up where you left off.'}
+              {' '}
+              {statusModal !== 'restore' && (show.buyerEmail
+                ? `${show.buyerName || 'The buyer'} (${show.buyerEmail}), you, and the artist's management team will be emailed automatically.`
+                : 'You and the artist\'s management team will be emailed automatically.')}
             </p>
 
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
-              Reason <span className="text-gray-400 font-normal normal-case">(optional, included in buyer email)</span>
-            </label>
-            <textarea
-              value={statusReason}
-              onChange={e => setStatusReason(e.target.value)}
-              placeholder={statusModal === 'cancelled' ? 'e.g. Venue conflict' : 'e.g. New date TBD, artist illness'}
-              rows={3}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 transition-all mb-4 resize-none"
-            />
+            {statusModal !== 'restore' && (
+              <>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
+                  Reason <span className="text-gray-400 font-normal normal-case">(optional, included in the email)</span>
+                </label>
+                <textarea
+                  value={statusReason}
+                  onChange={e => setStatusReason(e.target.value)}
+                  placeholder={statusModal === 'cancelled' ? 'e.g. Venue conflict' : 'e.g. New date TBD, artist illness'}
+                  rows={3}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 transition-all mb-4 resize-none"
+                />
+              </>
+            )}
 
             <div className="flex gap-2">
               <button onClick={() => { setStatusModal(null); setStatusReason('') }}
@@ -769,9 +794,17 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                 Never mind
               </button>
               <button onClick={handleConfirmStatusChange} disabled={updatingStatus}
-                className={`flex-1 flex items-center justify-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl text-white disabled:opacity-50 transition-colors ${statusModal === 'cancelled' ? 'bg-red-600 hover:bg-red-500' : 'bg-orange-500 hover:bg-orange-400'}`}>
-                {updatingStatus ? <Loader2 size={14} className="animate-spin" /> : (statusModal === 'cancelled' ? <XCircle size={14} /> : <PauseCircle size={14} />)}
-                {statusModal === 'cancelled' ? 'Cancel Show' : 'Postpone Show'}
+                className={`flex-1 flex items-center justify-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl text-white disabled:opacity-50 transition-colors ${
+                  statusModal === 'cancelled' ? 'bg-red-600 hover:bg-red-500'
+                  : statusModal === 'postponed' ? 'bg-orange-500 hover:bg-orange-400'
+                  : 'bg-emerald-600 hover:bg-emerald-500'
+                }`}>
+                {updatingStatus
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : statusModal === 'cancelled' ? <XCircle size={14} />
+                  : statusModal === 'postponed' ? <PauseCircle size={14} />
+                  : <RotateCcw size={14} />}
+                {statusModal === 'cancelled' ? 'Yes, Cancel Show' : statusModal === 'postponed' ? 'Yes, Postpone Show' : 'Restore Show'}
               </button>
             </div>
           </div>

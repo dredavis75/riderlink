@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import {
   MapPin, AlertCircle, Bell, Plus, TrendingUp,
   Loader2, BookOpen, Zap, Music2, Download, FileUp, Trash2, Pencil, RefreshCw, LogOut,
-  XCircle, PauseCircle, X,
+  XCircle, PauseCircle, X, RotateCcw,
 } from 'lucide-react'
 import { MOCK_SHOWS, SHOW_STATUS_CONFIG, type Show, type RiderPdfSection } from '@/lib/data'
 import { getShows, subscribeToAllShows, getSectionsForShows, addSection, deleteSection, updateSectionLabel, createShow, updateShowStatus } from '@/lib/db'
@@ -100,7 +100,7 @@ function ShowCard({
   const [editingId, setEditingId]   = useState<string | null>(null)
   const [editLabel, setEditLabel]   = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
-  const [statusModal, setStatusModal]   = useState<'cancelled' | 'postponed' | null>(null)
+  const [statusModal, setStatusModal]   = useState<'cancelled' | 'postponed' | 'restore' | null>(null)
   const [statusReason, setStatusReason] = useState('')
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [statusMsg, setStatusMsg]       = useState<string | null>(null)
@@ -140,11 +140,12 @@ function ShowCard({
 
   async function handleConfirmStatusChange() {
     if (!statusModal) return
+    const targetStatus: Show['status'] = statusModal === 'restore' ? 'active' : statusModal
     setUpdatingStatus(true)
     try {
-      await updateShowStatus(show.id, statusModal)
-      onStatusChanged(show.id, statusModal)
-      if (show.buyerEmail) {
+      await updateShowStatus(show.id, targetStatus)
+      onStatusChanged(show.id, targetStatus)
+      if (statusModal === 'cancelled' || statusModal === 'postponed') {
         fetch('/api/notify-status', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -155,8 +156,10 @@ function ShowCard({
             reason: statusReason.trim() || undefined,
           }),
         }).catch(() => {})
+        setStatusMsg(`✓ Marked as ${statusModal} — confirmation email sent`)
+      } else {
+        setStatusMsg('✓ Show restored to Active')
       }
-      setStatusMsg(`✓ Marked as ${statusModal}${show.buyerEmail ? ' — buyer notified' : ''}`)
       setStatusModal(null)
       setStatusReason('')
     } catch (e: any) {
@@ -259,7 +262,23 @@ function ShowCard({
             </div>
           ))}
 
-          {show.status !== 'postponed' && show.status !== 'cancelled' ? (
+          {show.status === 'cancelled' ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg border text-red-700 bg-red-50 border-red-200">
+                <XCircle size={10} /> Cancelled
+              </div>
+              <button
+                onClick={e => { e.stopPropagation(); setStatusModal('restore'); setStatusMsg(null) }}
+                className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded-lg transition-colors"
+              >
+                <RotateCcw size={10} /> Restore Show
+              </button>
+            </div>
+          ) : show.status === 'postponed' ? (
+            <div className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg border w-fit text-orange-700 bg-orange-50 border-orange-200">
+              <PauseCircle size={10} /> Postponed
+            </div>
+          ) : (
             <div className="flex items-center gap-2">
               <button
                 onClick={e => { e.stopPropagation(); setStatusModal('postponed'); setStatusMsg(null) }}
@@ -273,11 +292,6 @@ function ShowCard({
               >
                 <XCircle size={10} /> Cancel Show
               </button>
-            </div>
-          ) : (
-            <div className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg border w-fit ${show.status === 'cancelled' ? 'text-red-700 bg-red-50 border-red-200' : 'text-orange-700 bg-orange-50 border-orange-200'}`}>
-              {show.status === 'cancelled' ? <XCircle size={10} /> : <PauseCircle size={10} />}
-              {show.status === 'cancelled' ? 'Cancelled' : 'Postponed'}
             </div>
           )}
           {statusMsg && <p className={`text-xs font-semibold ${statusMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{statusMsg}</p>}
@@ -322,7 +336,7 @@ function ShowCard({
         </div>
       )}
 
-      {/* Cancel / Postpone confirm modal */}
+      {/* Cancel / Postpone / Restore confirm modal */}
       {statusModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
@@ -331,28 +345,40 @@ function ShowCard({
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-base font-black text-gray-900">
-                {statusModal === 'cancelled' ? 'Cancel this show?' : 'Postpone this show?'}
+                {statusModal === 'cancelled' ? 'Are you sure you want to cancel this show?'
+                  : statusModal === 'postponed' ? 'Are you sure you want to postpone this show?'
+                  : 'Restore this show?'}
               </h3>
-              <button onClick={() => { setStatusModal(null); setStatusReason('') }} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+              <button onClick={() => { setStatusModal(null); setStatusReason('') }} className="p-1 rounded-lg hover:bg-gray-100 transition-colors shrink-0">
                 <X size={16} className="text-gray-500" />
               </button>
             </div>
             <p className="text-xs text-gray-500 mb-4">
-              {show.buyerEmail
-                ? `${show.buyerName || 'The buyer'} (${show.buyerEmail}) will be emailed automatically.`
-                : 'No buyer email on file — this will only update the status.'}
+              {statusModal === 'cancelled'
+                ? "This is a fail-safe to prevent accidental cancellations — the show will disappear from your active list and move to Archived. You can restore it later if plans change."
+                : statusModal === 'postponed'
+                ? 'This is a fail-safe to prevent accidental postponements — the show stays on your dashboard marked as postponed.'
+                : 'This brings the show back to Active status in your main list so you can pick up where you left off.'}
+              {' '}
+              {statusModal !== 'restore' && (show.buyerEmail
+                ? `${show.buyerName || 'The buyer'} (${show.buyerEmail}), you, and the artist's management team will be emailed automatically.`
+                : 'You and the artist\'s management team will be emailed automatically.')}
             </p>
 
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
-              Reason <span className="text-gray-400 font-normal normal-case">(optional, included in buyer email)</span>
-            </label>
-            <textarea
-              value={statusReason}
-              onChange={e => setStatusReason(e.target.value)}
-              placeholder={statusModal === 'cancelled' ? 'e.g. Venue conflict' : 'e.g. New date TBD, artist illness'}
-              rows={3}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 transition-all mb-4 resize-none"
-            />
+            {statusModal !== 'restore' && (
+              <>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
+                  Reason <span className="text-gray-400 font-normal normal-case">(optional, included in the email)</span>
+                </label>
+                <textarea
+                  value={statusReason}
+                  onChange={e => setStatusReason(e.target.value)}
+                  placeholder={statusModal === 'cancelled' ? 'e.g. Venue conflict' : 'e.g. New date TBD, artist illness'}
+                  rows={3}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 transition-all mb-4 resize-none"
+                />
+              </>
+            )}
 
             <div className="flex gap-2">
               <button onClick={() => { setStatusModal(null); setStatusReason('') }}
@@ -360,9 +386,17 @@ function ShowCard({
                 Never mind
               </button>
               <button onClick={handleConfirmStatusChange} disabled={updatingStatus}
-                className={`flex-1 flex items-center justify-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl text-white disabled:opacity-50 transition-colors ${statusModal === 'cancelled' ? 'bg-red-600 hover:bg-red-500' : 'bg-orange-500 hover:bg-orange-400'}`}>
-                {updatingStatus ? <Loader2 size={14} className="animate-spin" /> : (statusModal === 'cancelled' ? <XCircle size={14} /> : <PauseCircle size={14} />)}
-                {statusModal === 'cancelled' ? 'Cancel Show' : 'Postpone Show'}
+                className={`flex-1 flex items-center justify-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl text-white disabled:opacity-50 transition-colors ${
+                  statusModal === 'cancelled' ? 'bg-red-600 hover:bg-red-500'
+                  : statusModal === 'postponed' ? 'bg-orange-500 hover:bg-orange-400'
+                  : 'bg-emerald-600 hover:bg-emerald-500'
+                }`}>
+                {updatingStatus
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : statusModal === 'cancelled' ? <XCircle size={14} />
+                  : statusModal === 'postponed' ? <PauseCircle size={14} />
+                  : <RotateCcw size={14} />}
+                {statusModal === 'cancelled' ? 'Yes, Cancel Show' : statusModal === 'postponed' ? 'Yes, Postpone Show' : 'Restore Show'}
               </button>
             </div>
           </div>
@@ -374,7 +408,7 @@ function ShowCard({
 
 export default function Dashboard() {
   const router = useRouter()
-  const [filter, setFilter]         = useState<'all' | 'active' | 'issues'>('all')
+  const [filter, setFilter]         = useState<'all' | 'active' | 'issues' | 'archived'>('all')
   const [shows, setShows]           = useState<Show[]>(MOCK_SHOWS)
   const [sections, setSections]     = useState<Record<string, RiderPdfSection[]>>({})
   const [loading, setLoading]       = useState(true)
@@ -436,14 +470,18 @@ export default function Dashboard() {
     await load(workspaceId)
   }
 
+  const liveShows     = shows.filter(s => s.status !== 'cancelled')
   const filtered      = shows.filter(s => {
+    if (filter === 'archived') return s.status === 'cancelled'
+    if (s.status === 'cancelled') return false
     if (filter === 'active') return s.status === 'active' || s.status === 'sent'
     if (filter === 'issues') return s.items.some(i => i.status === 'unavailable' || i.status === 'substituted')
     return true
   })
-  const activeShows   = shows.filter(s => s.status === 'active' || s.status === 'sent').length
-  const totalIssues   = shows.flatMap(s => s.items).filter(i => i.status === 'unavailable' || i.status === 'substituted').length
-  const totalMessages = shows.flatMap(s => s.messages).filter(m => m.from === 'buyer').length
+  const archivedCount = shows.filter(s => s.status === 'cancelled').length
+  const activeShows   = liveShows.filter(s => s.status === 'active' || s.status === 'sent').length
+  const totalIssues   = liveShows.flatMap(s => s.items).filter(i => i.status === 'unavailable' || i.status === 'substituted').length
+  const totalMessages = liveShows.flatMap(s => s.messages).filter(m => m.from === 'buyer').length
 
   return (
     <div className="min-h-screen bg-transparent">
@@ -543,6 +581,14 @@ export default function Dashboard() {
               {f === 'all' ? 'All Shows' : f === 'active' ? '⚡ Active' : '⚠ Attention'}
             </button>
           ))}
+          <button onClick={() => setFilter('archived')}
+            className={`flex items-center gap-1.5 text-sm font-black px-4 py-2 rounded-xl transition-all ${
+              filter === 'archived'
+                ? 'bg-gray-800 text-white shadow-lg shadow-gray-800/20'
+                : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}>
+            🗄 Archived{archivedCount > 0 ? ` (${archivedCount})` : ''}
+          </button>
           {loading && <Loader2 size={15} className="animate-spin text-gray-400 ml-1" />}
           <span className="ml-auto text-xs font-semibold text-gray-500">
             {filtered.length} show{filtered.length !== 1 ? 's' : ''}

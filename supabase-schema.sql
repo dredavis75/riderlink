@@ -11,7 +11,7 @@ create table if not exists shows (
   date        date not null,
   buyer_name  text not null default '',
   buyer_email text not null default '',
-  status      text not null default 'draft' check (status in ('draft','sent','active','confirmed')),
+  status      text not null default 'draft' check (status in ('draft','sent','active','confirmed','postponed','cancelled')),
   created_at  timestamptz not null default now()
 );
 
