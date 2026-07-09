@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Send, Copy, CheckCircle2, AlertCircle,
   MessageSquare, Edit3, ExternalLink, Loader2, Zap, Download, Sparkles, Trash2,
-  Calendar, Phone, Mail, Shield, Music, DollarSign, Wrench, FileText, Clock, Users, XCircle, PauseCircle, X, RotateCcw,
+  Calendar, Phone, Mail, Shield, Music, DollarSign, Wrench, FileText, Clock, Users, XCircle, PauseCircle, X, RotateCcw, Plus,
 } from 'lucide-react'
 import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
-import { getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, getAllManagementContacts, type ManagementContact } from '@/lib/db'
+import { getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact } from '@/lib/db'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
 import ProductImage from '@/app/components/ProductImage'
 
@@ -67,7 +67,13 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [newMessage, setNewMessage]   = useState('')
   const [editingItem, setEditingItem]       = useState<string | null>(null)
   const [editValue, setEditValue]           = useState('')
+  const [editQuantity, setEditQuantity]     = useState('')
+  const [editNotes, setEditNotes]           = useState('')
   const [editingCategory, setEditingCategory] = useState<string | null>(null)
+  const [addingItemTo, setAddingItemTo]     = useState<string | null>(null)
+  const [newItemName, setNewItemName]       = useState('')
+  const [newItemQuantity, setNewItemQuantity] = useState('')
+  const [newItemNotes, setNewItemNotes]     = useState('')
   const [categoryValue, setCategoryValue]   = useState('')
   const [copied, setCopied]           = useState(false)
   const [activeTab, setActiveTab]     = useState<'rider' | 'messages' | 'dayofshow'>('rider')
@@ -89,6 +95,9 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [statusReason, setStatusReason] = useState('')
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
+  const [riderResetModal, setRiderResetModal] = useState(false)
+  const [resettingRider, setResettingRider] = useState(false)
+  const [riderResetMsg, setRiderResetMsg] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -128,14 +137,27 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   }
 
   async function saveEdit(itemId: string) {
-    setShow(prev => prev ? { ...prev, items: prev.items.map(i => i.id === itemId ? { ...i, name: editValue } : i) } : prev)
+    setShow(prev => prev ? { ...prev, items: prev.items.map(i => i.id === itemId ? { ...i, name: editValue, quantity: editQuantity, notes: editNotes } : i) } : prev)
     setEditingItem(null)
-    try { await updateItem(itemId, { name: editValue }) } catch {}
+    try { await updateItem(itemId, { name: editValue, quantity: editQuantity, notes: editNotes }) } catch {}
   }
 
   async function handleDeleteItem(itemId: string) {
     setShow(prev => prev ? { ...prev, items: prev.items.filter(i => i.id !== itemId) } : prev)
     try { await deleteShowItem(itemId) } catch {}
+  }
+
+  async function handleAddItem(category: string) {
+    if (!show || !newItemName.trim()) return
+    const sortOrder = show.items.length
+    try {
+      const item = await addShowItem(show.id, {
+        category, name: newItemName.trim(), quantity: newItemQuantity.trim(), notes: newItemNotes.trim(),
+      }, sortOrder)
+      setShow(prev => prev ? { ...prev, items: [...prev.items, item] } : prev)
+      setAddingItemTo(null)
+      setNewItemName(''); setNewItemQuantity(''); setNewItemNotes('')
+    } catch { /* keep form open on failure */ }
   }
 
   async function saveCategory(oldCategory: string) {
@@ -257,6 +279,20 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
     setUpdatingStatus(false)
   }
 
+  async function handleResetRiderFromMaster() {
+    if (!show) return
+    setResettingRider(true)
+    try {
+      await resetShowRiderFromMaster(show.id, show.artist)
+      await load()
+      setRiderResetMsg('✓ Rider reset to the latest master rider')
+      setRiderResetModal(false)
+    } catch (e: any) {
+      setRiderResetMsg('✕ ' + e.message)
+    }
+    setResettingRider(false)
+  }
+
   return (
     <div className="min-h-screen bg-transparent">
       {/* ── Hero header ── */}
@@ -369,6 +405,11 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                   </a>
                 ) : null
               })()}
+              <button onClick={() => { setRiderResetModal(true); setRiderResetMsg(null) }}
+                className="flex items-center gap-2 text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 transition-all">
+                <RotateCcw size={13} /> Reset to Latest Rider
+              </button>
+              {riderResetMsg && <p className={`text-xs font-semibold ${riderResetMsg.startsWith('✓') ? 'text-emerald-300' : 'text-red-300'}`}>{riderResetMsg}</p>}
             </div>
           </div>
 
@@ -563,22 +604,35 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                             <ProductImage name={item.name} category={item.category} size={80} />
                             <div className="flex-1 min-w-0">
                               {editingItem === item.id ? (
-                                <div className="flex gap-2">
+                                <div className="space-y-1.5">
                                   <input value={editValue} onChange={e => setEditValue(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && saveEdit(item.id)}
-                                    className="flex-1 text-sm bg-white border border-amber-200 text-gray-900 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" autoFocus />
-                                  <button onClick={() => saveEdit(item.id)} className="text-sm font-bold text-emerald-700">Save</button>
-                                  <button onClick={() => setEditingItem(null)} className="text-sm text-gray-500">Cancel</button>
+                                    placeholder="Item name"
+                                    className="w-full text-sm bg-white border border-amber-200 text-gray-900 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" autoFocus />
+                                  <div className="flex gap-1.5">
+                                    <input value={editQuantity} onChange={e => setEditQuantity(e.target.value)}
+                                      placeholder="Quantity"
+                                      className="w-24 text-sm bg-white border border-amber-200 text-gray-900 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                                    <input value={editNotes} onChange={e => setEditNotes(e.target.value)}
+                                      onKeyDown={e => e.key === 'Enter' && saveEdit(item.id)}
+                                      placeholder="Notes"
+                                      className="flex-1 text-sm bg-white border border-amber-200 text-gray-900 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button onClick={() => saveEdit(item.id)} className="text-sm font-bold text-emerald-700">Save</button>
+                                    <button onClick={() => setEditingItem(null)} className="text-sm text-gray-500">Cancel</button>
+                                  </div>
                                 </div>
                               ) : (
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-gray-900 text-sm">{item.name}</span>
-                                  <button onClick={() => { setEditingItem(item.id); setEditValue(item.name) }} className="text-gray-300 hover:text-gray-600 transition-colors">
-                                    <Edit3 size={11} />
-                                  </button>
-                                </div>
+                                <>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-gray-900 text-sm">{item.name}</span>
+                                    <button onClick={() => { setEditingItem(item.id); setEditValue(item.name); setEditQuantity(item.quantity); setEditNotes(item.notes) }} className="text-gray-300 hover:text-gray-600 transition-colors">
+                                      <Edit3 size={11} />
+                                    </button>
+                                  </div>
+                                  <span className="text-xs text-gray-500">{item.quantity}{item.notes ? ` · ${item.notes}` : ''}</span>
+                                </>
                               )}
-                              <span className="text-xs text-gray-500">{item.quantity}{item.notes ? ` · ${item.notes}` : ''}</span>
                               {item.buyerNote && (
                                 <div className="mt-2 text-xs bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-blue-700">
                                   <span className="font-bold">Buyer:</span> {item.buyerNote}
@@ -603,6 +657,35 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                         </div>
                       )
                     })}
+                  </div>
+                  <div className="px-5 py-3 border-t border-amber-100">
+                    {addingItemTo === category ? (
+                      <div className="space-y-1.5">
+                        <input value={newItemName} onChange={e => setNewItemName(e.target.value)}
+                          placeholder="Item name" autoFocus
+                          className="w-full text-sm bg-white border border-amber-200 text-gray-900 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                        <div className="flex gap-1.5">
+                          <input value={newItemQuantity} onChange={e => setNewItemQuantity(e.target.value)}
+                            placeholder="Quantity"
+                            className="w-24 text-sm bg-white border border-amber-200 text-gray-900 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                          <input value={newItemNotes} onChange={e => setNewItemNotes(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleAddItem(category)}
+                            placeholder="Notes"
+                            className="flex-1 text-sm bg-white border border-amber-200 text-gray-900 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleAddItem(category)} disabled={!newItemName.trim()}
+                            className="text-sm font-bold text-emerald-700 disabled:opacity-40">Add Item</button>
+                          <button onClick={() => { setAddingItemTo(null); setNewItemName(''); setNewItemQuantity(''); setNewItemNotes('') }}
+                            className="text-sm text-gray-500">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => setAddingItemTo(category)}
+                        className="flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 transition-colors">
+                        <Plus size={13} /> Add Item
+                      </button>
+                    )}
                   </div>
                 </div>
               )
@@ -805,6 +888,35 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                   : statusModal === 'postponed' ? <PauseCircle size={14} />
                   : <RotateCcw size={14} />}
                 {statusModal === 'cancelled' ? 'Yes, Cancel Show' : statusModal === 'postponed' ? 'Yes, Postpone Show' : 'Restore Show'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset to Latest Rider confirm modal */}
+      {riderResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-base font-black text-gray-900">Reset this show's rider?</h3>
+              <button onClick={() => setRiderResetModal(false)} className="p-1 rounded-lg hover:bg-gray-100 transition-colors shrink-0">
+                <X size={16} className="text-gray-500" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              This replaces every item on this show's rider with a fresh copy of the artist's current master rider, and resets all statuses back to pending.
+              Any items you've added just for this show, or statuses the buyer has already confirmed/flagged, will be lost. This can't be undone.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setRiderResetModal(false)}
+                className="flex-1 text-sm font-bold px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">
+                Never mind
+              </button>
+              <button onClick={handleResetRiderFromMaster} disabled={resettingRider}
+                className="flex-1 flex items-center justify-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl text-white disabled:opacity-50 transition-colors bg-red-600 hover:bg-red-500">
+                {resettingRider ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                Yes, Reset Rider
               </button>
             </div>
           </div>

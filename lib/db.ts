@@ -17,6 +17,7 @@ function mapShow(row: any): Show {
     buyerApprovedName: row.buyer_approved_name ?? undefined,
     riderVersion: row.rider_version ?? undefined,
     riderPdfUrl: row.rider_pdf_url ?? undefined,
+    masterRiderId: row.master_rider_id ?? undefined,
     runOfShowText: row.run_of_show_text ?? undefined,
     runOfShowPdfUrl: row.run_of_show_pdf_url ?? undefined,
     curfew: row.curfew ?? undefined,
@@ -73,6 +74,40 @@ export async function getShow(id: string): Promise<Show | null> {
 }
 
 export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages'> & { items: Omit<RiderItem, 'id'>[] }, workspaceId = 'default'): Promise<string> {
+  let itemsToInsert = show.items
+  let masterRiderId: string | null = null
+  let masterPdfUrl: string | null = null
+  let masterVersion: string | null = null
+
+  // Look up the artist's master rider regardless of how items were seeded —
+  // the official rider PDF link is independent of item source (template vs master vs manual).
+  const { data: master } = await supabase
+    .from('rider_masters')
+    .select('id, pdf_url, version, rider_master_items(*)')
+    .eq('artist', show.artist)
+    .eq('workspace_id', workspaceId)
+    .single()
+
+  if (master) {
+    masterRiderId = master.id
+    masterPdfUrl = master.pdf_url ?? null
+    masterVersion = master.version ?? null
+  }
+
+  // Auto-populate items from master rider only if none were provided
+  if (itemsToInsert.length === 0 && master?.rider_master_items?.length) {
+    itemsToInsert = (master.rider_master_items as any[])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(i => ({
+        category: i.category,
+        name: i.name,
+        quantity: i.quantity,
+        notes: i.notes ?? '',
+        status: 'pending' as ItemStatus,
+        buyerNote: '',
+      }))
+  }
+
   const { data, error } = await supabase
     .from('shows')
     .insert({
@@ -84,36 +119,14 @@ export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages'> &
       buyer_email: show.buyerEmail,
       status: show.status,
       workspace_id: workspaceId,
+      master_rider_id: masterRiderId,
+      rider_pdf_url: masterPdfUrl,
+      rider_version: masterVersion,
     })
     .select('id')
     .single()
 
   if (error || !data) throw error
-
-  let itemsToInsert = show.items
-
-  // Auto-populate from master rider if no items provided
-  if (itemsToInsert.length === 0) {
-    const { data: master } = await supabase
-      .from('rider_masters')
-      .select('id, rider_master_items(*)')
-      .eq('artist', show.artist)
-      .eq('workspace_id', workspaceId)
-      .single()
-
-    if (master?.rider_master_items?.length) {
-      itemsToInsert = (master.rider_master_items as any[])
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map(i => ({
-          category: i.category,
-          name: i.name,
-          quantity: i.quantity,
-          notes: i.notes ?? '',
-          status: 'pending' as ItemStatus,
-          buyerNote: '',
-        }))
-    }
-  }
 
   if (itemsToInsert.length > 0) {
     const { error: itemErr } = await supabase.from('rider_items').insert(
@@ -139,6 +152,47 @@ export async function updateShowStatus(showId: string, status: Show['status']) {
   if (error) throw error
 }
 
+export async function resetShowRiderFromMaster(showId: string, artist: string, workspaceId = 'default'): Promise<void> {
+  const { data: master, error: masterErr } = await supabase
+    .from('rider_masters')
+    .select('id, pdf_url, version, rider_master_items(*)')
+    .eq('artist', artist)
+    .eq('workspace_id', workspaceId)
+    .single()
+
+  if (masterErr || !master) throw new Error('No master rider found for this artist')
+
+  const { error: deleteErr } = await supabase.from('rider_items').delete().eq('show_id', showId)
+  if (deleteErr) throw deleteErr
+
+  const items = (master.rider_master_items as any[] ?? []).sort((a, b) => a.sort_order - b.sort_order)
+  if (items.length > 0) {
+    const { error: insertErr } = await supabase.from('rider_items').insert(
+      items.map((i, idx) => ({
+        show_id: showId,
+        category: i.category,
+        name: i.name,
+        quantity: i.quantity,
+        notes: i.notes ?? '',
+        status: 'pending' as ItemStatus,
+        buyer_note: '',
+        sort_order: idx,
+      }))
+    )
+    if (insertErr) throw insertErr
+  }
+
+  const { error: showErr } = await supabase
+    .from('shows')
+    .update({
+      master_rider_id: master.id,
+      rider_pdf_url: master.pdf_url ?? null,
+      rider_version: master.version ?? null,
+    })
+    .eq('id', showId)
+  if (showErr) throw showErr
+}
+
 export async function updateBuyer(showId: string, buyerName: string, buyerEmail: string) {
   const { error } = await supabase.from('shows').update({ buyer_name: buyerName, buyer_email: buyerEmail }).eq('id', showId)
   if (error) throw error
@@ -151,9 +205,31 @@ export async function deleteShowItem(itemId: string): Promise<void> {
   if (error) throw error
 }
 
-export async function updateItem(itemId: string, fields: { status?: ItemStatus; name?: string; buyer_note?: string; category?: string }) {
+export async function updateItem(itemId: string, fields: { status?: ItemStatus; name?: string; buyer_note?: string; category?: string; quantity?: string; notes?: string }) {
   const { error } = await supabase.from('rider_items').update(fields).eq('id', itemId)
   if (error) throw error
+}
+
+export async function addShowItem(
+  showId: string,
+  item: Pick<RiderItem, 'category' | 'name' | 'quantity' | 'notes'>,
+  sortOrder: number
+): Promise<RiderItem> {
+  const { data, error } = await supabase
+    .from('rider_items')
+    .insert({ show_id: showId, ...item, status: 'pending' as ItemStatus, buyer_note: '', sort_order: sortOrder })
+    .select()
+    .single()
+  if (error || !data) throw error
+  return {
+    id: data.id,
+    category: data.category,
+    name: data.name,
+    quantity: data.quantity,
+    notes: data.notes ?? '',
+    status: data.status,
+    buyerNote: data.buyer_note ?? '',
+  }
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────

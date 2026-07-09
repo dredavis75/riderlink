@@ -51,6 +51,7 @@ export interface Show {
   buyerApprovedName?: string
   riderVersion?: string
   riderPdfUrl?: string
+  masterRiderId?: string
   runOfShowText?: string
   runOfShowPdfUrl?: string
   curfew?: string

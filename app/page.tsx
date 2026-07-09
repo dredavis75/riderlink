@@ -191,6 +191,20 @@ function ShowCard({
       {/* PDF sections panel */}
       {isConfigured && (
         <div className="border-t border-amber-200 px-4 pb-4 pt-3 space-y-2">
+          {show.riderPdfUrl && (
+            <a
+              href={show.riderPdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded-lg transition-colors w-fit"
+            >
+              <Download size={10} /> Official Rider (from Master Rider)
+            </a>
+          )}
+          {hasSections && (
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest pt-1">Extra Rider Docs for This Show</p>
+          )}
           {hasSections && sections.map(s => (
             <div key={s.id} className="flex items-center gap-2 group/row">
               {editingId === s.id ? (
@@ -230,7 +244,7 @@ function ShowCard({
               onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
               className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:text-amber-50 hover:bg-amber-50 px-2.5 py-1.5 rounded-lg transition-all border border-dashed border-amber-800/40 hover:border-amber-700"
             >
-              <FileUp size={10} /> {hasSections ? 'Add PDF' : 'Attach Rider PDF'}
+              <FileUp size={10} /> {hasSections ? 'Add Extra Rider Doc' : 'Attach Extra Rider Doc'}
             </button>
             {hasSections && (
               <a
