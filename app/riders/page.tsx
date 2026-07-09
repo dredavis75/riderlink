@@ -14,6 +14,7 @@ import {
   updateMasterItem, deleteMasterItem, bumpMasterVersion, saveMasterPdfUrl,
   getAllManagementContacts, addManagementContact, updateManagementContact, deleteManagementContact,
   type ManagementContact,
+  getCommunityPhotos, updateCommunityPhoto, deleteCommunityPhoto, type CommunityPhoto,
 } from '@/lib/db'
 import { getWorkspaceId } from '@/lib/workspace'
 import { supabase } from '@/lib/supabase'
@@ -94,6 +95,10 @@ export default function RiderLibrary() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoResult, setPhotoResult] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
+  const [communityPhotos, setCommunityPhotos] = useState<CommunityPhoto[]>([])
+  const [loadingCommunityPhotos, setLoadingCommunityPhotos] = useState(false)
+  const [editingCommunityId, setEditingCommunityId] = useState<string | null>(null)
+  const [editCommunityKeyword, setEditCommunityKeyword] = useState('')
 
   const load = useCallback(async (wsId: string) => {
     if (!isConfigured) { setLoading(false); return }
@@ -141,6 +146,28 @@ export default function RiderLibrary() {
     setUploadingItemImageId(null)
   }
 
+  async function loadCommunityPhotoList() {
+    setLoadingCommunityPhotos(true)
+    try {
+      const photos = await getCommunityPhotos(workspaceId)
+      setCommunityPhotos(photos)
+    } catch { /* keep prior list on failure */ }
+    setLoadingCommunityPhotos(false)
+  }
+
+  async function handleSaveCommunityKeyword(id: string) {
+    const keyword = editCommunityKeyword.trim().toLowerCase()
+    if (!keyword) return
+    setCommunityPhotos(prev => prev.map(p => p.id === id ? { ...p, keyword } : p))
+    setEditingCommunityId(null)
+    try { await updateCommunityPhoto(id, keyword) } catch {}
+  }
+
+  async function handleDeleteCommunityPhoto(id: string) {
+    setCommunityPhotos(prev => prev.filter(p => p.id !== id))
+    try { await deleteCommunityPhoto(id) } catch {}
+  }
+
   async function handleUploadPhoto() {
     if (!photoFile || !photoKeyword.trim()) return
     setUploadingPhoto(true)
@@ -156,6 +183,7 @@ export default function RiderLibrary() {
       setPhotoResult('✓ Photo added to community library')
       setPhotoKeyword('')
       setPhotoFile(null)
+      await loadCommunityPhotoList()
     } catch (e: any) {
       setPhotoResult('✕ ' + e.message)
     }
@@ -332,7 +360,7 @@ export default function RiderLibrary() {
                 <p className="text-xs text-gray-500">Master riders per artist — templates for every show</p>
               </div>
             </div>
-            <button onClick={() => { setPhotoOpen(true); setPhotoResult(null) }}
+            <button onClick={() => { setPhotoOpen(true); setPhotoResult(null); loadCommunityPhotoList() }}
               className="flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-200 transition-all">
               <ImagePlus size={14} /> Add Photo
             </button>
@@ -685,6 +713,44 @@ export default function RiderLibrary() {
                 <X size={16} className="text-gray-500" />
               </button>
             </div>
+
+            {(loadingCommunityPhotos || communityPhotos.length > 0) && (
+              <div className="mb-4 max-h-48 overflow-y-auto space-y-1.5 border border-gray-100 rounded-xl p-2">
+                {loadingCommunityPhotos && communityPhotos.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-2">Loading…</p>
+                )}
+                {communityPhotos.map(photo => (
+                  <div key={photo.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1.5">
+                    <img src={photo.url} alt="" className="w-8 h-8 rounded-md object-cover shrink-0" />
+                    {editingCommunityId === photo.id ? (
+                      <input
+                        value={editCommunityKeyword}
+                        onChange={e => setEditCommunityKeyword(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleSaveCommunityKeyword(photo.id); if (e.key === 'Escape') setEditingCommunityId(null) }}
+                        onBlur={() => handleSaveCommunityKeyword(photo.id)}
+                        autoFocus
+                        className="flex-1 text-xs bg-white border border-amber-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => { setEditingCommunityId(photo.id); setEditCommunityKeyword(photo.keyword) }}
+                        className="flex-1 text-left text-xs font-semibold text-gray-700 hover:text-amber-700 transition-colors truncate"
+                      >
+                        {photo.keyword}
+                      </button>
+                    )}
+                    <button onClick={() => { setEditingCommunityId(photo.id); setEditCommunityKeyword(photo.keyword) }}
+                      className="p-1 rounded text-gray-300 hover:text-gray-600 transition-colors shrink-0">
+                      <Edit3 size={11} />
+                    </button>
+                    <button onClick={() => handleDeleteCommunityPhoto(photo.id)}
+                      className="p-1 rounded text-gray-300 hover:text-red-500 transition-colors shrink-0">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="space-y-3">
               <div>

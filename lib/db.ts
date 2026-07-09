@@ -826,10 +826,11 @@ export interface CommunityPhoto {
   uploadedBy: string
 }
 
-export async function getCommunityPhotos(): Promise<CommunityPhoto[]> {
+export async function getCommunityPhotos(workspaceId = 'default'): Promise<CommunityPhoto[]> {
   const { data } = await supabase
     .from('community_photos')
     .select('*')
+    .eq('workspace_id', workspaceId)
     .order('created_at', { ascending: false })
   return (data ?? []).map(row => ({
     id: row.id,
@@ -837,6 +838,16 @@ export async function getCommunityPhotos(): Promise<CommunityPhoto[]> {
     url: row.url,
     uploadedBy: row.workspace_id ?? '',
   }))
+}
+
+export async function updateCommunityPhoto(id: string, keyword: string): Promise<void> {
+  const { error } = await supabase.from('community_photos').update({ keyword: keyword.trim().toLowerCase() }).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteCommunityPhoto(id: string): Promise<void> {
+  const { error } = await supabase.from('community_photos').delete().eq('id', id)
+  if (error) throw error
 }
 
 // ── Workspaces ────────────────────────────────────────────────────────────────

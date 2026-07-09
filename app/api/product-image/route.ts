@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { lookupLocalLogo } from '@/lib/riderLogos'
+import { getLocalImage } from '@/lib/riderImageMap'
 
 export const maxDuration = 15
 
@@ -208,7 +208,7 @@ export async function GET(req: NextRequest) {
   let imageUrl: string | null = null
 
   // 0. Local rider logos folder — always first, instant, no API call
-  const local = lookupLocalLogo(name)
+  const local = getLocalImage(name)
   if (local) {
     cache.set(cacheKey, { url: local, ts: Date.now() })
     return NextResponse.json({ imageUrl: local }, { headers: NO_CACHE })
