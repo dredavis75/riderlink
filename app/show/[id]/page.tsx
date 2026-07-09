@@ -5,10 +5,13 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Send, Copy, CheckCircle2, AlertCircle,
   MessageSquare, Edit3, ExternalLink, Loader2, Zap, Download, Sparkles, Trash2,
-  Calendar, Phone, Mail, Shield, Music, DollarSign, Wrench, FileText, Clock, Users, XCircle, PauseCircle, X, RotateCcw, Plus, MapPin,
+  Calendar, Phone, Mail, Shield, Music, DollarSign, Wrench, FileText, Clock, Users, XCircle, PauseCircle, X, RotateCcw, Plus, MapPin, Building2, Plane,
 } from 'lucide-react'
-import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
-import { getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, updateShowVenue, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact } from '@/lib/db'
+import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, FLIGHT_CLASS_LABELS, type RiderItem, type ItemStatus, type Show, type FlightClass } from '@/lib/data'
+import {
+  getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, updateShowVenue, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact,
+  addHotel, updateHotel, deleteHotel, addRoomingEntry, updateRoomingEntry, deleteRoomingEntry, addFlight, updateFlight, deleteFlight, updateShowTravelFlags,
+} from '@/lib/db'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
 import ProductImage from '@/app/components/ProductImage'
 import VenueMap from '@/app/components/VenueMap'
@@ -77,7 +80,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [newItemNotes, setNewItemNotes]     = useState('')
   const [categoryValue, setCategoryValue]   = useState('')
   const [copied, setCopied]           = useState(false)
-  const [activeTab, setActiveTab]     = useState<'rider' | 'messages' | 'dayofshow'>('rider')
+  const [activeTab, setActiveTab]     = useState<'rider' | 'messages' | 'dayofshow' | 'travel'>('rider')
   const [live, setLive]               = useState(false)
   const [extracting, setExtracting]   = useState(false)
   const [extractResult, setExtractResult] = useState<string | null>(null)
@@ -103,6 +106,50 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [riderResetModal, setRiderResetModal] = useState(false)
   const [resettingRider, setResettingRider] = useState(false)
   const [riderResetMsg, setRiderResetMsg] = useState<string | null>(null)
+
+  // Hotels
+  const [addingHotel, setAddingHotel] = useState(false)
+  const [newHotelName, setNewHotelName] = useState('')
+  const [newHotelAddress, setNewHotelAddress] = useState('')
+  const [newHotelLat, setNewHotelLat] = useState<number | null>(null)
+  const [newHotelLng, setNewHotelLng] = useState<number | null>(null)
+  const [lookingUpHotel, setLookingUpHotel] = useState(false)
+  const [hotelError, setHotelError] = useState('')
+  const [editingHotelId, setEditingHotelId] = useState<string | null>(null)
+  const [editHotelName, setEditHotelName] = useState('')
+  const [editHotelAddress, setEditHotelAddress] = useState('')
+
+  // Rooming list
+  const [addingRoom, setAddingRoom] = useState(false)
+  const [newRoomHotelId, setNewRoomHotelId] = useState('')
+  const [newRoomType, setNewRoomType] = useState('')
+  const [newRoomGuest, setNewRoomGuest] = useState('')
+  const [newRoomCheckin, setNewRoomCheckin] = useState('')
+  const [newRoomCheckout, setNewRoomCheckout] = useState('')
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
+  const [editRoomHotelId, setEditRoomHotelId] = useState('')
+  const [editRoomType, setEditRoomType] = useState('')
+  const [editRoomGuest, setEditRoomGuest] = useState('')
+  const [editRoomCheckin, setEditRoomCheckin] = useState('')
+  const [editRoomCheckout, setEditRoomCheckout] = useState('')
+
+  // Flights
+  const [addingFlight, setAddingFlight] = useState(false)
+  const [newFlightPassenger, setNewFlightPassenger] = useState('')
+  const [newFlightAirline, setNewFlightAirline] = useState('')
+  const [newFlightNumber, setNewFlightNumber] = useState('')
+  const [newFlightOrigin, setNewFlightOrigin] = useState('')
+  const [newFlightDestination, setNewFlightDestination] = useState('')
+  const [newFlightDate, setNewFlightDate] = useState('')
+  const [newFlightClass, setNewFlightClass] = useState<FlightClass>('coach')
+  const [editingFlightId, setEditingFlightId] = useState<string | null>(null)
+  const [editFlightPassenger, setEditFlightPassenger] = useState('')
+  const [editFlightAirline, setEditFlightAirline] = useState('')
+  const [editFlightNumber, setEditFlightNumber] = useState('')
+  const [editFlightOrigin, setEditFlightOrigin] = useState('')
+  const [editFlightDestination, setEditFlightDestination] = useState('')
+  const [editFlightDate, setEditFlightDate] = useState('')
+  const [editFlightClass, setEditFlightClass] = useState<FlightClass>('coach')
 
   const load = useCallback(async () => {
     try {
@@ -318,6 +365,146 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
     setResettingRider(false)
   }
 
+  async function handleToggleBuyerCoversHotel() {
+    if (!show) return
+    const next = !show.buyerCoversHotel
+    setShow(prev => prev ? { ...prev, buyerCoversHotel: next } : prev)
+    try { await updateShowTravelFlags(show.id, { buyerCoversHotel: next }) } catch {}
+  }
+
+  async function handleToggleBuyerCoversFlights() {
+    if (!show) return
+    const next = !show.buyerCoversFlights
+    setShow(prev => prev ? { ...prev, buyerCoversFlights: next } : prev)
+    try { await updateShowTravelFlags(show.id, { buyerCoversFlights: next }) } catch {}
+  }
+
+  async function lookupNewHotelAddress() {
+    if (!newHotelAddress.trim()) return
+    setLookingUpHotel(true)
+    setHotelError('')
+    try {
+      const res = await fetch(`/api/places?address=${encodeURIComponent(newHotelAddress.trim())}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Address not found')
+      setNewHotelAddress(data.address)
+      setNewHotelLat(typeof data.lat === 'number' ? data.lat : null)
+      setNewHotelLng(typeof data.lng === 'number' ? data.lng : null)
+    } catch (e: any) {
+      setHotelError(e?.message ?? 'Could not find that address')
+      setNewHotelLat(null)
+      setNewHotelLng(null)
+    }
+    setLookingUpHotel(false)
+  }
+
+  async function handleAddHotel() {
+    if (!show || !newHotelName.trim()) return
+    try {
+      const hotel = await addHotel(show.id, {
+        name: newHotelName.trim(),
+        address: newHotelAddress.trim() || undefined,
+        lat: newHotelLat ?? undefined,
+        lng: newHotelLng ?? undefined,
+      }, show.hotels.length)
+      setShow(prev => prev ? { ...prev, hotels: [...prev.hotels, hotel] } : prev)
+      setAddingHotel(false)
+      setNewHotelName(''); setNewHotelAddress(''); setNewHotelLat(null); setNewHotelLng(null); setHotelError('')
+    } catch (e: any) {
+      setHotelError(e?.message ?? 'Could not add hotel')
+    }
+  }
+
+  async function handleSaveHotelEdit(id: string) {
+    setShow(prev => prev ? { ...prev, hotels: prev.hotels.map(h => h.id === id ? { ...h, name: editHotelName, address: editHotelAddress } : h) } : prev)
+    setEditingHotelId(null)
+    try { await updateHotel(id, { name: editHotelName, address: editHotelAddress }) } catch {}
+  }
+
+  async function handleDeleteHotel(id: string) {
+    setShow(prev => prev ? {
+      ...prev,
+      hotels: prev.hotels.filter(h => h.id !== id),
+      roomingList: prev.roomingList.filter(r => r.hotelId !== id),
+    } : prev)
+    try { await deleteHotel(id) } catch {}
+  }
+
+  async function handleAddRoom() {
+    if (!show || !newRoomHotelId) return
+    try {
+      const room = await addRoomingEntry(show.id, {
+        hotelId: newRoomHotelId, roomType: newRoomType.trim(), guestName: newRoomGuest.trim() || undefined,
+        checkinDate: newRoomCheckin || undefined, checkoutDate: newRoomCheckout || undefined,
+      }, show.roomingList.length)
+      setShow(prev => prev ? { ...prev, roomingList: [...prev.roomingList, room] } : prev)
+      setAddingRoom(false)
+      setNewRoomHotelId(''); setNewRoomType(''); setNewRoomGuest(''); setNewRoomCheckin(''); setNewRoomCheckout('')
+    } catch { /* keep form open on failure */ }
+  }
+
+  async function handleSaveRoomEdit(id: string) {
+    setShow(prev => prev ? {
+      ...prev,
+      roomingList: prev.roomingList.map(r => r.id === id ? { ...r, hotelId: editRoomHotelId, roomType: editRoomType, guestName: editRoomGuest, checkinDate: editRoomCheckin, checkoutDate: editRoomCheckout } : r),
+    } : prev)
+    setEditingRoomId(null)
+    try {
+      await updateRoomingEntry(id, { hotelId: editRoomHotelId, roomType: editRoomType, guestName: editRoomGuest, checkinDate: editRoomCheckin, checkoutDate: editRoomCheckout })
+    } catch {}
+  }
+
+  async function handleDeleteRoom(id: string) {
+    setShow(prev => prev ? { ...prev, roomingList: prev.roomingList.filter(r => r.id !== id) } : prev)
+    try { await deleteRoomingEntry(id) } catch {}
+  }
+
+  async function handleAddFlight() {
+    if (!show || !newFlightPassenger.trim()) return
+    try {
+      const flight = await addFlight(show.id, {
+        passengerName: newFlightPassenger.trim(), airline: newFlightAirline.trim(), flightNumber: newFlightNumber.trim(),
+        origin: newFlightOrigin.trim(), destination: newFlightDestination.trim(), flightDate: newFlightDate || undefined,
+        classOfService: newFlightClass,
+      }, show.flights.length)
+      setShow(prev => prev ? { ...prev, flights: [...prev.flights, flight] } : prev)
+      setAddingFlight(false)
+      setNewFlightPassenger(''); setNewFlightAirline(''); setNewFlightNumber(''); setNewFlightOrigin(''); setNewFlightDestination(''); setNewFlightDate(''); setNewFlightClass('coach')
+    } catch { /* keep form open on failure */ }
+  }
+
+  async function handleSaveFlightEdit(id: string) {
+    setShow(prev => prev ? {
+      ...prev,
+      flights: prev.flights.map(f => f.id === id ? {
+        ...f, passengerName: editFlightPassenger, airline: editFlightAirline, flightNumber: editFlightNumber,
+        origin: editFlightOrigin, destination: editFlightDestination, flightDate: editFlightDate, classOfService: editFlightClass,
+      } : f),
+    } : prev)
+    setEditingFlightId(null)
+    try {
+      await updateFlight(id, {
+        passengerName: editFlightPassenger, airline: editFlightAirline, flightNumber: editFlightNumber,
+        origin: editFlightOrigin, destination: editFlightDestination, flightDate: editFlightDate, classOfService: editFlightClass,
+      })
+    } catch {}
+  }
+
+  async function handleDeleteFlight(id: string) {
+    setShow(prev => prev ? { ...prev, flights: prev.flights.filter(f => f.id !== id) } : prev)
+    try { await deleteFlight(id) } catch {}
+  }
+
+  function distanceFromVenue(lat?: number, lng?: number): string | null {
+    if (!show?.venueLat || !show?.venueLng || lat == null || lng == null) return null
+    const R = 3958.8 // miles
+    const dLat = (lat - show.venueLat) * Math.PI / 180
+    const dLng = (lng - show.venueLng) * Math.PI / 180
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(show.venueLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+    const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return `${d.toFixed(1)} mi from venue`
+  }
+
   return (
     <div className="min-h-screen bg-transparent">
       {/* ── Hero header ── */}
@@ -517,6 +704,11 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
               className={`flex items-center gap-2 text-sm font-black px-4 py-2 rounded-xl transition-all whitespace-nowrap ${activeTab === 'dayofshow' ? 'bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20' : 'bg-white border border-amber-300 text-amber-800 hover:bg-amber-50'}`}>
               <Calendar size={13} /> Day of Show
               {(show.dayOfShowContacts || show.runOfShowText || show.runOfShowPdfUrl) && <span className="w-2 h-2 rounded-full bg-emerald-500" />}
+            </button>
+            <button onClick={() => setActiveTab('travel')}
+              className={`flex items-center gap-2 text-sm font-black px-4 py-2 rounded-xl transition-all whitespace-nowrap ${activeTab === 'travel' ? 'bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20' : 'bg-white border border-amber-300 text-amber-800 hover:bg-amber-50'}`}>
+              <Building2 size={13} /> Travel
+              {(show.hotels.length > 0 || show.flights.length > 0) && <span className="w-2 h-2 rounded-full bg-emerald-500" />}
             </button>
             <button onClick={() => setShareOpen(o => !o)}
               className={`flex items-center gap-2 text-sm font-black px-4 py-2 rounded-xl transition-all whitespace-nowrap ${shareOpen ? 'bg-amber-500 text-gray-950' : 'bg-white border border-amber-300 text-amber-800 hover:bg-amber-50'}`}>
@@ -879,6 +1071,290 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {/* ── Travel tab ── */}
+        {activeTab === 'travel' && (
+          <div className="space-y-5 animate-slide-up">
+            {/* Hotels + Rooming List */}
+            <div className="bg-white border border-amber-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2"><Building2 size={13} /> Hotels &amp; Rooming List</h3>
+                <button onClick={handleToggleBuyerCoversHotel}
+                  className={`flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl transition-all ${show.buyerCoversHotel ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                  {show.buyerCoversHotel ? <CheckCircle2 size={13} /> : <Building2 size={13} />}
+                  Buyer Covers Hotel
+                </button>
+              </div>
+              {show.buyerCoversHotel && (
+                <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-4">
+                  Visible to the buyer on their buyer page.
+                </p>
+              )}
+
+              <div className="space-y-2 mb-4">
+                {show.hotels.length === 0 && !addingHotel && <p className="text-sm text-gray-400">No hotels added yet.</p>}
+                {show.hotels.map(hotel => (
+                  <div key={hotel.id} className="border border-amber-200 rounded-xl p-3 bg-amber-50">
+                    {editingHotelId === hotel.id ? (
+                      <div className="space-y-1.5">
+                        <input value={editHotelName} onChange={e => setEditHotelName(e.target.value)} placeholder="Hotel name"
+                          className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                        <input value={editHotelAddress} onChange={e => setEditHotelAddress(e.target.value)} placeholder="Address"
+                          className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                        <div className="flex gap-2">
+                          <button onClick={() => handleSaveHotelEdit(hotel.id)} className="text-sm font-bold text-emerald-700">Save</button>
+                          <button onClick={() => setEditingHotelId(null)} className="text-sm text-gray-500">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-gray-900 text-sm">{hotel.name}</span>
+                            <button onClick={() => { setEditingHotelId(hotel.id); setEditHotelName(hotel.name); setEditHotelAddress(hotel.address ?? '') }} className="text-gray-300 hover:text-gray-600 transition-colors">
+                              <Edit3 size={11} />
+                            </button>
+                          </div>
+                          {hotel.address && <p className="text-xs text-gray-500 mt-0.5">{hotel.address}</p>}
+                          {distanceFromVenue(hotel.lat, hotel.lng) && <p className="text-xs text-amber-700 font-semibold mt-0.5">{distanceFromVenue(hotel.lat, hotel.lng)}</p>}
+                        </div>
+                        <button onClick={() => handleDeleteHotel(hotel.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    )}
+                    {hotel.lat != null && hotel.lng != null && (
+                      <div className="mt-2"><VenueMap lat={hotel.lat} lng={hotel.lng} label={hotel.name} height={140} /></div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {addingHotel ? (
+                <div className="space-y-1.5 border border-amber-200 rounded-xl p-3 bg-amber-50">
+                  <input value={newHotelName} onChange={e => setNewHotelName(e.target.value)} placeholder="Hotel name" autoFocus
+                    className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                  <div className="flex gap-2">
+                    <input value={newHotelAddress} onChange={e => { setNewHotelAddress(e.target.value); setNewHotelLat(null); setNewHotelLng(null) }}
+                      onKeyDown={e => e.key === 'Enter' && lookupNewHotelAddress()}
+                      placeholder="Address (optional, for map + distance)"
+                      className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                    <button onClick={lookupNewHotelAddress} disabled={lookingUpHotel || !newHotelAddress.trim()}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-gray-950 disabled:opacity-40 transition-colors">
+                      {lookingUpHotel ? <Loader2 size={12} className="animate-spin" /> : 'Look Up'}
+                    </button>
+                  </div>
+                  {hotelError && <p className="text-xs text-red-600">{hotelError}</p>}
+                  {newHotelLat != null && newHotelLng != null && (
+                    <p className="text-xs text-emerald-700 flex items-center gap-1"><MapPin size={11} /> Location found — will show on the map</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button onClick={handleAddHotel} disabled={!newHotelName.trim()} className="text-sm font-bold text-emerald-700 disabled:opacity-40">Add Hotel</button>
+                    <button onClick={() => { setAddingHotel(false); setNewHotelName(''); setNewHotelAddress(''); setNewHotelLat(null); setNewHotelLng(null); setHotelError('') }} className="text-sm text-gray-500">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setAddingHotel(true)} className="flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 transition-colors">
+                  <Plus size={13} /> Add Hotel
+                </button>
+              )}
+
+              {show.hotels.length > 0 && (
+                <div className="mt-5 pt-4 border-t border-amber-100">
+                  <h4 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3">Rooming List</h4>
+                  <div className="space-y-2">
+                    {show.roomingList.length === 0 && !addingRoom && <p className="text-sm text-gray-400 mb-2">No rooms added yet.</p>}
+                    {show.roomingList.map(room => {
+                      const hotel = show.hotels.find(h => h.id === room.hotelId)
+                      return (
+                        <div key={room.id} className="border border-amber-200 rounded-xl p-3">
+                          {editingRoomId === room.id ? (
+                            <div className="space-y-1.5">
+                              <select value={editRoomHotelId} onChange={e => setEditRoomHotelId(e.target.value)}
+                                className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                {show.hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                              </select>
+                              <div className="flex gap-1.5">
+                                <input value={editRoomType} onChange={e => setEditRoomType(e.target.value)} placeholder="Room type"
+                                  className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                                <input value={editRoomGuest} onChange={e => setEditRoomGuest(e.target.value)} placeholder="Guest (optional)"
+                                  className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                              </div>
+                              <div className="flex gap-1.5">
+                                <input type="date" value={editRoomCheckin} onChange={e => setEditRoomCheckin(e.target.value)}
+                                  className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                                <input type="date" value={editRoomCheckout} onChange={e => setEditRoomCheckout(e.target.value)}
+                                  className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={() => handleSaveRoomEdit(room.id)} className="text-sm font-bold text-emerald-700">Save</button>
+                                <button onClick={() => setEditingRoomId(null)} className="text-sm text-gray-500">Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-bold text-gray-900">{hotel?.name ?? 'Unknown hotel'}{room.roomType && ` · ${room.roomType}`}</p>
+                                {room.guestName && <p className="text-xs text-gray-600 mt-0.5">{room.guestName}</p>}
+                                <p className="text-xs text-gray-500 mt-0.5">{room.checkinDate ?? '—'} → {room.checkoutDate ?? '—'}</p>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button onClick={() => { setEditingRoomId(room.id); setEditRoomHotelId(room.hotelId); setEditRoomType(room.roomType); setEditRoomGuest(room.guestName ?? ''); setEditRoomCheckin(room.checkinDate ?? ''); setEditRoomCheckout(room.checkoutDate ?? '') }}
+                                  className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 transition-colors">
+                                  <Edit3 size={12} />
+                                </button>
+                                <button onClick={() => handleDeleteRoom(room.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {addingRoom ? (
+                    <div className="space-y-1.5 border border-amber-200 rounded-xl p-3 mt-2">
+                      <select value={newRoomHotelId} onChange={e => setNewRoomHotelId(e.target.value)} autoFocus
+                        className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="">Select hotel…</option>
+                        {show.hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                      </select>
+                      <div className="flex gap-1.5">
+                        <input value={newRoomType} onChange={e => setNewRoomType(e.target.value)} placeholder="Room type"
+                          className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                        <input value={newRoomGuest} onChange={e => setNewRoomGuest(e.target.value)} placeholder="Guest (optional)"
+                          className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                      </div>
+                      <div className="flex gap-1.5">
+                        <input type="date" value={newRoomCheckin} onChange={e => setNewRoomCheckin(e.target.value)}
+                          className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                        <input type="date" value={newRoomCheckout} onChange={e => setNewRoomCheckout(e.target.value)}
+                          className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={handleAddRoom} disabled={!newRoomHotelId} className="text-sm font-bold text-emerald-700 disabled:opacity-40">Add Room</button>
+                        <button onClick={() => { setAddingRoom(false); setNewRoomHotelId(''); setNewRoomType(''); setNewRoomGuest(''); setNewRoomCheckin(''); setNewRoomCheckout('') }} className="text-sm text-gray-500">Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setAddingRoom(true)} className="flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 transition-colors mt-2">
+                      <Plus size={13} /> Add Room
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Flights */}
+            <div className="bg-white border border-amber-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2"><Plane size={13} /> Flights</h3>
+                <button onClick={handleToggleBuyerCoversFlights}
+                  className={`flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl transition-all ${show.buyerCoversFlights ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                  {show.buyerCoversFlights ? <CheckCircle2 size={13} /> : <Plane size={13} />}
+                  Buyer Covers Flights
+                </button>
+              </div>
+              {show.buyerCoversFlights && (
+                <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-4">
+                  Visible to the buyer on their buyer page.
+                </p>
+              )}
+
+              <div className="space-y-2 mb-3">
+                {show.flights.length === 0 && !addingFlight && <p className="text-sm text-gray-400">No flights added yet.</p>}
+                {show.flights.map(flight => (
+                  <div key={flight.id} className="border border-amber-200 rounded-xl p-3 bg-amber-50">
+                    {editingFlightId === flight.id ? (
+                      <div className="space-y-1.5">
+                        <input value={editFlightPassenger} onChange={e => setEditFlightPassenger(e.target.value)} placeholder="Passenger name"
+                          className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                        <div className="flex gap-1.5">
+                          <input value={editFlightAirline} onChange={e => setEditFlightAirline(e.target.value)} placeholder="Airline"
+                            className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                          <input value={editFlightNumber} onChange={e => setEditFlightNumber(e.target.value)} placeholder="Flight #"
+                            className="w-24 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                        </div>
+                        <div className="flex gap-1.5">
+                          <input value={editFlightOrigin} onChange={e => setEditFlightOrigin(e.target.value)} placeholder="From"
+                            className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                          <input value={editFlightDestination} onChange={e => setEditFlightDestination(e.target.value)} placeholder="To"
+                            className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                        </div>
+                        <div className="flex gap-1.5">
+                          <input type="date" value={editFlightDate} onChange={e => setEditFlightDate(e.target.value)}
+                            className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                          <select value={editFlightClass} onChange={e => setEditFlightClass(e.target.value as FlightClass)}
+                            className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            {(Object.keys(FLIGHT_CLASS_LABELS) as FlightClass[]).map(c => <option key={c} value={c}>{FLIGHT_CLASS_LABELS[c]}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleSaveFlightEdit(flight.id)} className="text-sm font-bold text-emerald-700">Save</button>
+                          <button onClick={() => setEditingFlightId(null)} className="text-sm text-gray-500">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">{flight.passengerName}</p>
+                          <p className="text-xs text-gray-600 mt-0.5">{flight.airline} {flight.flightNumber} · {flight.origin} → {flight.destination}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{flight.flightDate ?? '—'} · <span className="font-semibold text-amber-700">{FLIGHT_CLASS_LABELS[flight.classOfService]}</span></p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => { setEditingFlightId(flight.id); setEditFlightPassenger(flight.passengerName); setEditFlightAirline(flight.airline); setEditFlightNumber(flight.flightNumber); setEditFlightOrigin(flight.origin); setEditFlightDestination(flight.destination); setEditFlightDate(flight.flightDate ?? ''); setEditFlightClass(flight.classOfService) }}
+                            className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 transition-colors">
+                            <Edit3 size={12} />
+                          </button>
+                          <button onClick={() => handleDeleteFlight(flight.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {addingFlight ? (
+                <div className="space-y-1.5 border border-amber-200 rounded-xl p-3 bg-amber-50">
+                  <input value={newFlightPassenger} onChange={e => setNewFlightPassenger(e.target.value)} placeholder="Passenger name" autoFocus
+                    className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                  <div className="flex gap-1.5">
+                    <input value={newFlightAirline} onChange={e => setNewFlightAirline(e.target.value)} placeholder="Airline"
+                      className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                    <input value={newFlightNumber} onChange={e => setNewFlightNumber(e.target.value)} placeholder="Flight #"
+                      className="w-24 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                  </div>
+                  <div className="flex gap-1.5">
+                    <input value={newFlightOrigin} onChange={e => setNewFlightOrigin(e.target.value)} placeholder="From"
+                      className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                    <input value={newFlightDestination} onChange={e => setNewFlightDestination(e.target.value)} placeholder="To"
+                      className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                  </div>
+                  <div className="flex gap-1.5">
+                    <input type="date" value={newFlightDate} onChange={e => setNewFlightDate(e.target.value)}
+                      className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                    <select value={newFlightClass} onChange={e => setNewFlightClass(e.target.value as FlightClass)}
+                      className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                      {(Object.keys(FLIGHT_CLASS_LABELS) as FlightClass[]).map(c => <option key={c} value={c}>{FLIGHT_CLASS_LABELS[c]}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleAddFlight} disabled={!newFlightPassenger.trim()} className="text-sm font-bold text-emerald-700 disabled:opacity-40">Add Flight</button>
+                    <button onClick={() => { setAddingFlight(false); setNewFlightPassenger(''); setNewFlightAirline(''); setNewFlightNumber(''); setNewFlightOrigin(''); setNewFlightDestination(''); setNewFlightDate(''); setNewFlightClass('coach') }} className="text-sm text-gray-500">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setAddingFlight(true)} className="flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 transition-colors">
+                  <Plus size={13} /> Add Flight
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

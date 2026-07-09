@@ -60,6 +60,55 @@ export interface Show {
   curfew?: string
   dayOfShowContacts?: DayOfShowContacts
   buyerAttachments?: BuyerAttachment[]
+  buyerCoversHotel: boolean
+  buyerCoversFlights: boolean
+  hotels: Hotel[]
+  roomingList: RoomingListEntry[]
+  flights: Flight[]
+}
+
+export interface Hotel {
+  id: string
+  showId: string
+  name: string
+  address?: string
+  lat?: number
+  lng?: number
+  sortOrder: number
+}
+
+export interface RoomingListEntry {
+  id: string
+  showId: string
+  hotelId: string
+  roomType: string
+  guestName?: string
+  checkinDate?: string
+  checkoutDate?: string
+  sortOrder: number
+}
+
+export type FlightClass = 'first' | 'business' | 'premium' | 'comfort' | 'coach'
+
+export const FLIGHT_CLASS_LABELS: Record<FlightClass, string> = {
+  first: 'First Class',
+  business: 'Business Class',
+  premium: 'Premium',
+  comfort: 'Comfort',
+  coach: 'Coach',
+}
+
+export interface Flight {
+  id: string
+  showId: string
+  passengerName: string
+  airline: string
+  flightNumber: string
+  origin: string
+  destination: string
+  flightDate?: string
+  classOfService: FlightClass
+  sortOrder: number
 }
 
 export interface RiderPdfSection {
@@ -93,6 +142,11 @@ export interface MasterRider {
 export const MOCK_SHOWS: Show[] = [
   {
     id: 'show-atl-001',
+    buyerCoversHotel: false,
+    buyerCoversFlights: false,
+    hotels: [],
+    roomingList: [],
+    flights: [],
     artist: 'SKRILLA',
     venue: 'State Farm Arena',
     city: 'Atlanta, GA',
@@ -135,6 +189,11 @@ export const MOCK_SHOWS: Show[] = [
   },
   {
     id: 'show-chi-002',
+    buyerCoversHotel: false,
+    buyerCoversFlights: false,
+    hotels: [],
+    roomingList: [],
+    flights: [],
     artist: 'G Herbo',
     venue: 'United Center',
     city: 'Chicago, IL',
@@ -155,6 +214,11 @@ export const MOCK_SHOWS: Show[] = [
   },
   {
     id: 'show-nyc-003',
+    buyerCoversHotel: false,
+    buyerCoversFlights: false,
+    hotels: [],
+    roomingList: [],
+    flights: [],
     artist: 'Keyshia Cole',
     venue: 'Barclays Center',
     city: 'New York, NY',
@@ -181,6 +245,11 @@ export const MOCK_SHOWS: Show[] = [
   },
   {
     id: 'show-la-004',
+    buyerCoversHotel: false,
+    buyerCoversFlights: false,
+    hotels: [],
+    roomingList: [],
+    flights: [],
     artist: 'Flo Milli',
     venue: 'Kia Forum',
     city: 'Los Angeles, CA',

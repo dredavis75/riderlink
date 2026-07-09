@@ -1,5 +1,5 @@
 import { supabase, isConfigured } from './supabase'
-import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem, RiderTemplate, RiderPdfSection, DayOfShowContacts, BuyerAttachment } from './data'
+import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem, RiderTemplate, RiderPdfSection, DayOfShowContacts, BuyerAttachment, Hotel, RoomingListEntry, Flight, FlightClass } from './data'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -26,6 +26,8 @@ function mapShow(row: any): Show {
     curfew: row.curfew ?? undefined,
     dayOfShowContacts: row.day_of_show_contacts ?? undefined,
     buyerAttachments: row.buyer_attachments ?? undefined,
+    buyerCoversHotel: row.buyer_covers_hotel ?? false,
+    buyerCoversFlights: row.buyer_covers_flights ?? false,
     items: (row.rider_items ?? [])
       .sort((a: any, b: any) => a.sort_order - b.sort_order)
       .map((i: any): RiderItem => ({
@@ -46,6 +48,43 @@ function mapShow(row: any): Show {
         text: m.text,
         timestamp: m.created_at,
       })),
+    hotels: (row.hotels ?? [])
+      .sort((a: any, b: any) => a.sort_order - b.sort_order)
+      .map((h: any): Hotel => ({
+        id: h.id,
+        showId: h.show_id,
+        name: h.name,
+        address: h.address || undefined,
+        lat: h.lat ?? undefined,
+        lng: h.lng ?? undefined,
+        sortOrder: h.sort_order,
+      })),
+    roomingList: (row.rooming_list ?? [])
+      .sort((a: any, b: any) => a.sort_order - b.sort_order)
+      .map((r: any): RoomingListEntry => ({
+        id: r.id,
+        showId: r.show_id,
+        hotelId: r.hotel_id,
+        roomType: r.room_type ?? '',
+        guestName: r.guest_name || undefined,
+        checkinDate: r.checkin_date ?? undefined,
+        checkoutDate: r.checkout_date ?? undefined,
+        sortOrder: r.sort_order,
+      })),
+    flights: (row.flights ?? [])
+      .sort((a: any, b: any) => a.sort_order - b.sort_order)
+      .map((f: any): Flight => ({
+        id: f.id,
+        showId: f.show_id,
+        passengerName: f.passenger_name ?? '',
+        airline: f.airline ?? '',
+        flightNumber: f.flight_number ?? '',
+        origin: f.origin ?? '',
+        destination: f.destination ?? '',
+        flightDate: f.flight_date ?? undefined,
+        classOfService: (f.class_of_service ?? 'coach') as FlightClass,
+        sortOrder: f.sort_order,
+      })),
   }
 }
 
@@ -55,7 +94,7 @@ export async function getShows(workspaceId = 'default'): Promise<Show[]> {
   if (!isConfigured) throw new Error('Supabase not configured')
   const { data: shows, error } = await supabase
     .from('shows')
-    .select('*, rider_items(*), messages(*)')
+    .select('*, rider_items(*), messages(*), hotels(*), rooming_list(*), flights(*)')
     .eq('workspace_id', workspaceId)
     .order('date', { ascending: true })
 
@@ -68,7 +107,7 @@ export async function getShow(id: string): Promise<Show | null> {
   if (!isConfigured) throw new Error('Supabase not configured')
   const { data, error } = await supabase
     .from('shows')
-    .select('*, rider_items(*), messages(*)')
+    .select('*, rider_items(*), messages(*), hotels(*), rooming_list(*), flights(*)')
     .eq('id', id)
     .single()
 
@@ -76,7 +115,7 @@ export async function getShow(id: string): Promise<Show | null> {
   return mapShow(data)
 }
 
-export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages'> & { items: Omit<RiderItem, 'id'>[] }, workspaceId = 'default'): Promise<string> {
+export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages' | 'buyerCoversHotel' | 'buyerCoversFlights' | 'hotels' | 'roomingList' | 'flights'> & { items: Omit<RiderItem, 'id'>[] }, workspaceId = 'default'): Promise<string> {
   let itemsToInsert = show.items
   let masterRiderId: string | null = null
   let masterPdfUrl: string | null = null
@@ -528,6 +567,171 @@ export async function deleteSection(id: string): Promise<void> {
 
 export async function updateSectionLabel(id: string, label: string): Promise<void> {
   await supabase.from('rider_pdf_sections').update({ label }).eq('id', id)
+}
+
+// ── Hotels + Rooming List ──────────────────────────────────────────────────────
+
+function mapHotel(row: any): Hotel {
+  return {
+    id: row.id,
+    showId: row.show_id,
+    name: row.name,
+    address: row.address || undefined,
+    lat: row.lat ?? undefined,
+    lng: row.lng ?? undefined,
+    sortOrder: row.sort_order,
+  }
+}
+
+export async function addHotel(
+  showId: string,
+  fields: { name: string; address?: string; lat?: number; lng?: number },
+  sortOrder: number
+): Promise<Hotel> {
+  const { data, error } = await supabase
+    .from('hotels')
+    .insert({ show_id: showId, name: fields.name, address: fields.address ?? '', lat: fields.lat ?? null, lng: fields.lng ?? null, sort_order: sortOrder })
+    .select()
+    .single()
+  if (error || !data) throw error
+  return mapHotel(data)
+}
+
+export async function updateHotel(
+  id: string,
+  fields: Partial<{ name: string; address: string; lat: number; lng: number }>
+): Promise<void> {
+  const { error } = await supabase.from('hotels').update(fields).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteHotel(id: string): Promise<void> {
+  const { error } = await supabase.from('hotels').delete().eq('id', id)
+  if (error) throw error
+}
+
+function mapRoomingEntry(row: any): RoomingListEntry {
+  return {
+    id: row.id,
+    showId: row.show_id,
+    hotelId: row.hotel_id,
+    roomType: row.room_type ?? '',
+    guestName: row.guest_name || undefined,
+    checkinDate: row.checkin_date ?? undefined,
+    checkoutDate: row.checkout_date ?? undefined,
+    sortOrder: row.sort_order,
+  }
+}
+
+export async function addRoomingEntry(
+  showId: string,
+  fields: { hotelId: string; roomType: string; guestName?: string; checkinDate?: string; checkoutDate?: string },
+  sortOrder: number
+): Promise<RoomingListEntry> {
+  const { data, error } = await supabase
+    .from('rooming_list')
+    .insert({
+      show_id: showId,
+      hotel_id: fields.hotelId,
+      room_type: fields.roomType,
+      guest_name: fields.guestName ?? '',
+      checkin_date: fields.checkinDate || null,
+      checkout_date: fields.checkoutDate || null,
+      sort_order: sortOrder,
+    })
+    .select()
+    .single()
+  if (error || !data) throw error
+  return mapRoomingEntry(data)
+}
+
+export async function updateRoomingEntry(
+  id: string,
+  fields: Partial<{ hotelId: string; roomType: string; guestName: string; checkinDate: string; checkoutDate: string }>
+): Promise<void> {
+  const dbFields: Record<string, unknown> = {}
+  if (fields.hotelId !== undefined) dbFields.hotel_id = fields.hotelId
+  if (fields.roomType !== undefined) dbFields.room_type = fields.roomType
+  if (fields.guestName !== undefined) dbFields.guest_name = fields.guestName
+  if (fields.checkinDate !== undefined) dbFields.checkin_date = fields.checkinDate || null
+  if (fields.checkoutDate !== undefined) dbFields.checkout_date = fields.checkoutDate || null
+  const { error } = await supabase.from('rooming_list').update(dbFields).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteRoomingEntry(id: string): Promise<void> {
+  const { error } = await supabase.from('rooming_list').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ── Flights ─────────────────────────────────────────────────────────────────────
+
+function mapFlight(row: any): Flight {
+  return {
+    id: row.id,
+    showId: row.show_id,
+    passengerName: row.passenger_name ?? '',
+    airline: row.airline ?? '',
+    flightNumber: row.flight_number ?? '',
+    origin: row.origin ?? '',
+    destination: row.destination ?? '',
+    flightDate: row.flight_date ?? undefined,
+    classOfService: (row.class_of_service ?? 'coach') as FlightClass,
+    sortOrder: row.sort_order,
+  }
+}
+
+export async function addFlight(
+  showId: string,
+  fields: { passengerName: string; airline: string; flightNumber: string; origin: string; destination: string; flightDate?: string; classOfService: FlightClass },
+  sortOrder: number
+): Promise<Flight> {
+  const { data, error } = await supabase
+    .from('flights')
+    .insert({
+      show_id: showId,
+      passenger_name: fields.passengerName,
+      airline: fields.airline,
+      flight_number: fields.flightNumber,
+      origin: fields.origin,
+      destination: fields.destination,
+      flight_date: fields.flightDate || null,
+      class_of_service: fields.classOfService,
+      sort_order: sortOrder,
+    })
+    .select()
+    .single()
+  if (error || !data) throw error
+  return mapFlight(data)
+}
+
+export async function updateFlight(
+  id: string,
+  fields: Partial<{ passengerName: string; airline: string; flightNumber: string; origin: string; destination: string; flightDate: string; classOfService: FlightClass }>
+): Promise<void> {
+  const dbFields: Record<string, unknown> = {}
+  if (fields.passengerName !== undefined) dbFields.passenger_name = fields.passengerName
+  if (fields.airline !== undefined) dbFields.airline = fields.airline
+  if (fields.flightNumber !== undefined) dbFields.flight_number = fields.flightNumber
+  if (fields.origin !== undefined) dbFields.origin = fields.origin
+  if (fields.destination !== undefined) dbFields.destination = fields.destination
+  if (fields.flightDate !== undefined) dbFields.flight_date = fields.flightDate || null
+  if (fields.classOfService !== undefined) dbFields.class_of_service = fields.classOfService
+  const { error } = await supabase.from('flights').update(dbFields).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteFlight(id: string): Promise<void> {
+  const { error } = await supabase.from('flights').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function updateShowTravelFlags(showId: string, fields: { buyerCoversHotel?: boolean; buyerCoversFlights?: boolean }): Promise<void> {
+  const dbFields: Record<string, unknown> = {}
+  if (fields.buyerCoversHotel !== undefined) dbFields.buyer_covers_hotel = fields.buyerCoversHotel
+  if (fields.buyerCoversFlights !== undefined) dbFields.buyer_covers_flights = fields.buyerCoversFlights
+  const { error } = await supabase.from('shows').update(dbFields).eq('id', showId)
+  if (error) throw error
 }
 
 // ── Artist Management Contacts ────────────────────────────────────────────────

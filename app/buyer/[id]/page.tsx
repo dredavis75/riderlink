@@ -2,8 +2,8 @@
 
 import { useState, useEffect, use, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, Download, Zap, Users, X, Phone, Mail, FileText, Upload, Shield, Music, DollarSign, Wrench, AlertTriangle, ArrowLeft } from 'lucide-react'
-import { MOCK_SHOWS, OFFICIAL_RIDER_PDFS, type RiderItem, type ItemStatus, type Show, type DayOfShowContacts } from '@/lib/data'
+import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, Download, Zap, Users, X, Phone, Mail, FileText, Upload, Shield, Music, DollarSign, Wrench, AlertTriangle, ArrowLeft, Building2, Plane } from 'lucide-react'
+import { MOCK_SHOWS, OFFICIAL_RIDER_PDFS, FLIGHT_CLASS_LABELS, type RiderItem, type ItemStatus, type Show, type DayOfShowContacts } from '@/lib/data'
 import { getShow, updateItem as dbUpdateItem, sendMessage as dbSendMessage, subscribeToShow, approveRider, saveShowDayOfShow, getAllManagementContacts, type ManagementContact } from '@/lib/db'
 import { supabase, isConfigured } from '@/lib/supabase'
 import type { NotifyPayload } from '@/app/api/notify/route'
@@ -822,6 +822,57 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
 
             {/* Share with Team */}
             <ShareWithTeam show={show} />
+
+            {/* Hotel & Flight Info */}
+            {(show.buyerCoversHotel || show.buyerCoversFlights) && (
+              <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden">
+                <div className="px-5 py-3 bg-amber-50 border-b border-amber-200">
+                  <h2 className="font-black text-xs text-gray-500 uppercase tracking-widest">Hotel &amp; Flight Info</h2>
+                </div>
+                <div className="p-5 space-y-5">
+                  {show.buyerCoversHotel && (
+                    <div>
+                      <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2"><Building2 size={13} /> Rooming List</h3>
+                      {show.roomingList.length === 0 ? (
+                        <p className="text-sm text-gray-400">Rooming list not yet available.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {show.roomingList.map(room => {
+                            const hotel = show.hotels.find(h => h.id === room.hotelId)
+                            return (
+                              <div key={room.id} className="border border-amber-200 rounded-xl p-3 bg-amber-50">
+                                <p className="text-sm font-bold text-gray-900">{hotel?.name ?? 'Hotel'}{room.roomType && ` · ${room.roomType}`}</p>
+                                {room.guestName && <p className="text-xs text-gray-600 mt-0.5">{room.guestName}</p>}
+                                <p className="text-xs text-gray-500 mt-0.5">{room.checkinDate ?? '—'} → {room.checkoutDate ?? '—'}</p>
+                                {hotel?.address && <p className="text-xs text-gray-500 mt-0.5">{hotel.address}</p>}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {show.buyerCoversFlights && (
+                    <div>
+                      <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2"><Plane size={13} /> Flights</h3>
+                      {show.flights.length === 0 ? (
+                        <p className="text-sm text-gray-400">Flight info not yet available.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {show.flights.map(flight => (
+                            <div key={flight.id} className="border border-amber-200 rounded-xl p-3 bg-amber-50">
+                              <p className="text-sm font-bold text-gray-900">{flight.passengerName}</p>
+                              <p className="text-xs text-gray-600 mt-0.5">{flight.airline} {flight.flightNumber} · {flight.origin} → {flight.destination}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">{flight.flightDate ?? '—'} · <span className="font-semibold text-amber-700">{FLIGHT_CLASS_LABELS[flight.classOfService]}</span></p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Day of Show Info */}
             <DayOfShowSection show={show} onNotify={notify} />
