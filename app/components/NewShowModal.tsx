@@ -29,6 +29,9 @@ export default function NewShowModal({ onClose, workspaceId = 'default' }: Props
   const [artist, setArtist] = useState<string>(ARTIST_ROSTER[0])
   const [venue, setVenue] = useState('')
   const [city, setCity] = useState('')
+  const [venueAddress, setVenueAddress] = useState('')
+  const [venueLat, setVenueLat] = useState<number | null>(null)
+  const [venueLng, setVenueLng] = useState<number | null>(null)
   const [date, setDate] = useState('')
   const [buyerName, setBuyerName] = useState('')
   const [buyerEmail, setBuyerEmail] = useState('')
@@ -39,6 +42,11 @@ export default function NewShowModal({ onClose, workspaceId = 'default' }: Props
   const [showDropdown, setShowDropdown] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Manual address fallback — for venues not in Google Places
+  const [manualAddressMode, setManualAddressMode] = useState(false)
+  const [lookingUpAddress, setLookingUpAddress] = useState(false)
+  const [addressLookupError, setAddressLookupError] = useState('')
 
   // Buyer autocomplete
   interface PromoterHit { name: string; email: string; venue: string; city: string }
@@ -96,12 +104,35 @@ export default function NewShowModal({ onClose, workspaceId = 'default' }: Props
     setVenue(p.name)
     setShowDropdown(false)
     setPredictions([])
-    // Fetch city from place details
+    // Fetch city + address + coordinates from place details
     try {
       const res = await fetch(`/api/places?placeId=${p.placeId}`)
       const data = await res.json()
       if (data.city) setCity(data.city)
+      if (data.address) setVenueAddress(data.address)
+      setVenueLat(typeof data.lat === 'number' ? data.lat : null)
+      setVenueLng(typeof data.lng === 'number' ? data.lng : null)
     } catch {}
+  }
+
+  const lookupManualAddress = async () => {
+    if (!venueAddress.trim()) return
+    setLookingUpAddress(true)
+    setAddressLookupError('')
+    try {
+      const res = await fetch(`/api/places?address=${encodeURIComponent(venueAddress.trim())}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Address not found')
+      setVenueAddress(data.address)
+      if (data.city) setCity(data.city)
+      setVenueLat(typeof data.lat === 'number' ? data.lat : null)
+      setVenueLng(typeof data.lng === 'number' ? data.lng : null)
+    } catch (e: any) {
+      setAddressLookupError(e?.message ?? 'Could not find that address')
+      setVenueLat(null)
+      setVenueLng(null)
+    }
+    setLookingUpAddress(false)
   }
 
   // Step 2
@@ -151,6 +182,9 @@ export default function NewShowModal({ onClose, workspaceId = 'default' }: Props
         artist,
         venue: venue.trim(),
         city: city.trim(),
+        venueAddress: venueAddress.trim() || undefined,
+        venueLat: venueLat ?? undefined,
+        venueLng: venueLng ?? undefined,
         date,
         buyerName: buyerName.trim(),
         buyerEmail: buyerEmail.trim(),
@@ -284,6 +318,39 @@ export default function NewShowModal({ onClose, workspaceId = 'default' }: Props
                     </div>
                   )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => { setManualAddressMode(m => !m); setAddressLookupError('') }}
+                  className="text-xs font-semibold text-amber-700 hover:text-amber-900 mt-1.5 underline underline-offset-2"
+                >
+                  {manualAddressMode ? "Search venues instead" : "Can't find your venue? Enter address manually"}
+                </button>
+
+                {manualAddressMode && (
+                  <div className="mt-2">
+                    <div className="flex gap-2">
+                      <input
+                        value={venueAddress}
+                        onChange={e => { setVenueAddress(e.target.value); setVenueLat(null); setVenueLng(null) }}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); lookupManualAddress() } }}
+                        placeholder="Full venue address…"
+                        className="flex-1 px-3.5 py-2.5 rounded-xl text-sm bg-amber-50 border border-amber-200 placeholder-slate-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={lookupManualAddress}
+                        disabled={lookingUpAddress || !venueAddress.trim()}
+                        className="px-4 py-2.5 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-400 text-gray-950 disabled:opacity-40 transition-colors flex items-center gap-2"
+                      >
+                        {lookingUpAddress ? <Loader2 size={14} className="animate-spin" /> : 'Look Up'}
+                      </button>
+                    </div>
+                    {addressLookupError && <p className="text-xs text-red-600 mt-1">{addressLookupError}</p>}
+                    {venueLat !== null && venueLng !== null && (
+                      <p className="text-xs text-emerald-700 mt-1 flex items-center gap-1"><MapPin size={11} /> Location found — will show on the map</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* City — auto-filled but editable */}

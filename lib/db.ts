@@ -9,6 +9,9 @@ function mapShow(row: any): Show {
     artist: row.artist,
     venue: row.venue,
     city: row.city,
+    venueAddress: row.venue_address ?? undefined,
+    venueLat: row.venue_lat ?? undefined,
+    venueLng: row.venue_lng ?? undefined,
     date: row.date,
     buyerName: row.buyer_name,
     buyerEmail: row.buyer_email,
@@ -114,6 +117,9 @@ export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages'> &
       artist: show.artist,
       venue: show.venue,
       city: show.city,
+      venue_address: show.venueAddress ?? null,
+      venue_lat: show.venueLat ?? null,
+      venue_lng: show.venueLng ?? null,
       date: show.date,
       buyer_name: show.buyerName,
       buyer_email: show.buyerEmail,
@@ -195,6 +201,20 @@ export async function resetShowRiderFromMaster(showId: string, artist: string, w
 
 export async function updateBuyer(showId: string, buyerName: string, buyerEmail: string) {
   const { error } = await supabase.from('shows').update({ buyer_name: buyerName, buyer_email: buyerEmail }).eq('id', showId)
+  if (error) throw error
+}
+
+export async function updateShowVenue(
+  showId: string,
+  fields: { venue?: string; city?: string; venueAddress?: string; venueLat?: number; venueLng?: number }
+) {
+  const dbFields: Record<string, unknown> = {}
+  if (fields.venue !== undefined) dbFields.venue = fields.venue
+  if (fields.city !== undefined) dbFields.city = fields.city
+  if (fields.venueAddress !== undefined) dbFields.venue_address = fields.venueAddress
+  if (fields.venueLat !== undefined) dbFields.venue_lat = fields.venueLat
+  if (fields.venueLng !== undefined) dbFields.venue_lng = fields.venueLng
+  const { error } = await supabase.from('shows').update(dbFields).eq('id', showId)
   if (error) throw error
 }
 

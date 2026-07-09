@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Send, Copy, CheckCircle2, AlertCircle,
   MessageSquare, Edit3, ExternalLink, Loader2, Zap, Download, Sparkles, Trash2,
-  Calendar, Phone, Mail, Shield, Music, DollarSign, Wrench, FileText, Clock, Users, XCircle, PauseCircle, X, RotateCcw, Plus,
+  Calendar, Phone, Mail, Shield, Music, DollarSign, Wrench, FileText, Clock, Users, XCircle, PauseCircle, X, RotateCcw, Plus, MapPin,
 } from 'lucide-react'
 import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, type RiderItem, type ItemStatus, type Show } from '@/lib/data'
-import { getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact } from '@/lib/db'
+import { getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, updateShowVenue, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact } from '@/lib/db'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
 import ProductImage from '@/app/components/ProductImage'
+import VenueMap from '@/app/components/VenueMap'
 
 const ARTIST_COLORS: Record<string, string> = {
   'G Herbo':     'from-emerald-600 to-emerald-800',
@@ -88,6 +89,10 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [buyerName, setBuyerName]     = useState('')
   const [buyerEmail, setBuyerEmail]   = useState('')
   const [buyerPhone, setBuyerPhone]   = useState('')
+  const [addressOpen, setAddressOpen]     = useState(false)
+  const [addressInput, setAddressInput]   = useState('')
+  const [lookingUpAddress, setLookingUpAddress] = useState(false)
+  const [addressError, setAddressError]   = useState('')
   const [inviting, setInviting]       = useState(false)
   const [inviteResult, setInviteResult] = useState<string | null>(null)
   const [mgmtContacts, setMgmtContacts] = useState<ManagementContact[]>([])
@@ -176,6 +181,26 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
     const msg = { id: `m${Date.now()}`, from: 'manager' as const, sender: 'Dré Davis', text, timestamp: new Date().toISOString() }
     setShow(prev => prev ? { ...prev, messages: [...prev.messages, msg] } : prev)
     try { await sendMessage(show?.id ?? id, 'manager', 'Dré Davis', text) } catch {}
+  }
+
+  async function handleSaveAddress() {
+    if (!show || !addressInput.trim()) return
+    setLookingUpAddress(true)
+    setAddressError('')
+    try {
+      const res = await fetch(`/api/places?address=${encodeURIComponent(addressInput.trim())}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Address not found')
+      const venueAddress = data.address as string
+      const venueLat = typeof data.lat === 'number' ? data.lat : undefined
+      const venueLng = typeof data.lng === 'number' ? data.lng : undefined
+      await updateShowVenue(show.id, { venueAddress, venueLat, venueLng })
+      setShow(prev => prev ? { ...prev, venueAddress, venueLat, venueLng } : prev)
+      setAddressOpen(false)
+    } catch (e: any) {
+      setAddressError(e?.message ?? 'Could not find that address')
+    }
+    setLookingUpAddress(false)
   }
 
   async function handleInviteBuyer() {
@@ -330,6 +355,27 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                 <p className="text-white/50 text-xs mt-0.5">
                   {new Date(show.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                 </p>
+                {addressOpen ? (
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    <input value={addressInput} onChange={e => setAddressInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleSaveAddress()}
+                      placeholder="Full venue address" autoFocus
+                      className="text-xs bg-white/10 border border-white/20 text-white placeholder-white/40 rounded-lg px-2 py-1 w-56 focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                    <button onClick={handleSaveAddress} disabled={lookingUpAddress || !addressInput.trim()}
+                      className="text-xs font-bold text-amber-400 hover:text-amber-300 disabled:opacity-40">
+                      {lookingUpAddress ? 'Looking up…' : 'Save'}
+                    </button>
+                    <button onClick={() => { setAddressOpen(false); setAddressError('') }} className="text-xs text-white/40 hover:text-white/70">Cancel</button>
+                    {addressError && <span className="text-xs text-red-300 w-full">{addressError}</span>}
+                  </div>
+                ) : (
+                  <button onClick={() => { setAddressOpen(true); setAddressInput(show.venueAddress ?? '') }}
+                    className="text-white/40 text-xs mt-1 hidden sm:flex items-center gap-1 hover:text-white/70 transition-colors group">
+                    <MapPin size={10} />
+                    {show.venueAddress ?? 'Add venue address'}
+                    <Edit3 size={9} className="opacity-0 group-hover:opacity-60 transition-opacity" />
+                  </button>
+                )}
                 {buyerOpen ? (
                   <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                     <input value={buyerName} onChange={e => setBuyerName(e.target.value)} placeholder="Buyer name"
@@ -445,6 +491,13 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2 text-sm text-red-700 font-semibold">
             <AlertCircle size={15} />
             {issueCount} item{issueCount > 1 ? 's' : ''} flagged — review below
+          </div>
+        )}
+
+        {/* Venue location map */}
+        {show.venueLat != null && show.venueLng != null && (
+          <div className="mb-4">
+            <VenueMap lat={show.venueLat} lng={show.venueLng} label={`${show.venue}, ${show.city}`} />
           </div>
         )}
 

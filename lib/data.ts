@@ -41,6 +41,9 @@ export interface Show {
   artist: string
   venue: string
   city: string
+  venueAddress?: string
+  venueLat?: number
+  venueLng?: number
   date: string
   buyerName: string
   buyerEmail: string

@@ -191,6 +191,17 @@ function ShowCard({
       {/* PDF sections panel */}
       {isConfigured && (
         <div className="border-t border-amber-200 px-4 pb-4 pt-3 space-y-2">
+          {show.venueLat != null && show.venueLng != null && (
+            <a
+              href={`https://maps.google.com/maps?q=${show.venueLat},${show.venueLng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 transition-colors w-fit"
+            >
+              <MapPin size={10} /> View on Map
+            </a>
+          )}
           {show.riderPdfUrl && (
             <a
               href={show.riderPdfUrl}
