@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS community_photos (
 
 ALTER TABLE community_photos ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "public_all" ON community_photos;
-CREATE POLICY "public_all" ON community_photos FOR ALL USING (true);
+DROP POLICY IF EXISTS community_photos_public_all ON community_photos;
+CREATE POLICY community_photos_public_all ON community_photos FOR ALL USING (true);
 
 -- Safe to re-run even if the table was already in the publication
 DO $$

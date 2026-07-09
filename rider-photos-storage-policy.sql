@@ -8,15 +8,15 @@ INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 VALUES ('rider-photos', 'rider-photos', true, 10485760, ARRAY['image/png','image/jpeg','image/webp','image/gif'])
 ON CONFLICT (id) DO NOTHING;
 
-DROP POLICY IF EXISTS "rider-photos public read"   ON storage.objects;
-DROP POLICY IF EXISTS "rider-photos anon upload"   ON storage.objects;
-DROP POLICY IF EXISTS "rider-photos anon update"   ON storage.objects;
+DROP POLICY IF EXISTS rider_photos_public_read ON storage.objects;
+DROP POLICY IF EXISTS rider_photos_anon_upload ON storage.objects;
+DROP POLICY IF EXISTS rider_photos_anon_update ON storage.objects;
 
-CREATE POLICY "rider-photos public read"
+CREATE POLICY rider_photos_public_read
   ON storage.objects FOR SELECT USING (bucket_id = 'rider-photos');
 
-CREATE POLICY "rider-photos anon upload"
+CREATE POLICY rider_photos_anon_upload
   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'rider-photos');
 
-CREATE POLICY "rider-photos anon update"
+CREATE POLICY rider_photos_anon_update
   ON storage.objects FOR UPDATE USING (bucket_id = 'rider-photos');
