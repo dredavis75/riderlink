@@ -41,10 +41,16 @@ export async function GET(req: NextRequest) {
       return acData.predictions?.[0]?.place_id ?? null
     }
 
-    // Try as a street address first (best match quality for addresses),
-    // then fall back to an unrestricted search so a bare venue/business
-    // name typed here still resolves instead of failing outright.
-    const topPlaceId = (await findPlaceId(address, 'geocode')) ?? (await findPlaceId(address))
+    // Try establishment first — it correctly handles both venue/business
+    // names AND full street addresses at that business's location, and
+    // avoids geocode-type mismatching a venue name against an unrelated
+    // place with the same literal name (e.g. "Warsaw" the venue in
+    // Brooklyn vs. the town of Warsaw, NY). Fall back to geocode type for
+    // addresses with no associated business, then fully unrestricted as
+    // a last resort so this practically never fails outright.
+    const topPlaceId = (await findPlaceId(address, 'establishment'))
+      ?? (await findPlaceId(address, 'geocode'))
+      ?? (await findPlaceId(address))
     if (!topPlaceId) return NextResponse.json({ error: 'Address not found' }, { status: 404 })
 
     const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${topPlaceId}&fields=formatted_address,address_components,geometry&key=${KEY}`
