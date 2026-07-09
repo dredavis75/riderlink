@@ -27,12 +27,22 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // Geocode a manually-typed address — fallback when a venue isn't in Places
+  // Geocode a manually-typed address — fallback when a venue isn't in Places.
+  // Uses Places Autocomplete (geocode type) + Place Details rather than the
+  // standalone Geocoding API, since that's a separate API that may not be
+  // enabled/allowed for this key — this stays entirely within Places API,
+  // which is already confirmed working for the venue search above.
   if (address) {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${KEY}`
-    const res = await fetch(url)
-    const data = await res.json()
-    const result = data.results?.[0]
+    const acUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(address)}&types=geocode&key=${KEY}`
+    const acRes = await fetch(acUrl)
+    const acData = await acRes.json()
+    const topPlaceId = acData.predictions?.[0]?.place_id
+    if (!topPlaceId) return NextResponse.json({ error: 'Address not found' }, { status: 404 })
+
+    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${topPlaceId}&fields=formatted_address,address_components,geometry&key=${KEY}`
+    const detailsRes = await fetch(detailsUrl)
+    const detailsData = await detailsRes.json()
+    const result = detailsData.result
     if (!result) return NextResponse.json({ error: 'Address not found' }, { status: 404 })
     const comps: any[] = result.address_components ?? []
     const city = comps.find((c: any) => c.types.includes('locality'))?.long_name ?? ''
