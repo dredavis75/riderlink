@@ -38,6 +38,7 @@ function mapShow(row: any): Show {
         notes: i.notes ?? '',
         status: i.status,
         buyerNote: i.buyer_note ?? '',
+        imageUrl: i.image_url ?? undefined,
       })),
     messages: (row.messages ?? [])
       .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -147,6 +148,7 @@ export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages' | 
         notes: i.notes ?? '',
         status: 'pending' as ItemStatus,
         buyerNote: '',
+        imageUrl: i.image_url ?? undefined,
       }))
   }
 
@@ -184,6 +186,7 @@ export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages' | 
         status: 'pending' as ItemStatus,
         buyer_note: '',
         sort_order: idx,
+        image_url: item.imageUrl ?? null,
       }))
     )
     if (itemErr) throw itemErr
@@ -222,6 +225,7 @@ export async function resetShowRiderFromMaster(showId: string, artist: string, w
         status: 'pending' as ItemStatus,
         buyer_note: '',
         sort_order: idx,
+        image_url: i.image_url ?? null,
       }))
     )
     if (insertErr) throw insertErr
@@ -264,7 +268,7 @@ export async function deleteShowItem(itemId: string): Promise<void> {
   if (error) throw error
 }
 
-export async function updateItem(itemId: string, fields: { status?: ItemStatus; name?: string; buyer_note?: string; category?: string; quantity?: string; notes?: string }) {
+export async function updateItem(itemId: string, fields: { status?: ItemStatus; name?: string; buyer_note?: string; category?: string; quantity?: string; notes?: string; image_url?: string }) {
   const { error } = await supabase.from('rider_items').update(fields).eq('id', itemId)
   if (error) throw error
 }
@@ -288,6 +292,7 @@ export async function addShowItem(
     notes: data.notes ?? '',
     status: data.status,
     buyerNote: data.buyer_note ?? '',
+    imageUrl: data.image_url ?? undefined,
   }
 }
 
@@ -364,6 +369,7 @@ function mapMasterRider(row: any): MasterRider {
         quantity: i.quantity,
         notes: i.notes ?? '',
         sortOrder: i.sort_order,
+        imageUrl: i.image_url ?? undefined,
       })),
   }
 }
@@ -446,12 +452,13 @@ export async function addMasterItem(
     quantity: data.quantity,
     notes: data.notes ?? '',
     sortOrder: data.sort_order,
+    imageUrl: data.image_url ?? undefined,
   }
 }
 
 export async function updateMasterItem(
   itemId: string,
-  fields: Partial<Pick<MasterRiderItem, 'category' | 'name' | 'quantity' | 'notes' | 'sortOrder'>>
+  fields: Partial<Pick<MasterRiderItem, 'category' | 'name' | 'quantity' | 'notes' | 'sortOrder' | 'imageUrl'>>
 ): Promise<void> {
   const dbFields: Record<string, unknown> = {}
   if (fields.category !== undefined) dbFields.category = fields.category
@@ -459,6 +466,7 @@ export async function updateMasterItem(
   if (fields.quantity !== undefined) dbFields.quantity = fields.quantity
   if (fields.notes !== undefined) dbFields.notes = fields.notes
   if (fields.sortOrder !== undefined) dbFields.sort_order = fields.sortOrder
+  if (fields.imageUrl !== undefined) dbFields.image_url = fields.imageUrl
   const { error } = await supabase.from('rider_master_items').update(dbFields).eq('id', itemId)
   if (error) throw error
 }

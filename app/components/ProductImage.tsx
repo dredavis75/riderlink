@@ -299,14 +299,17 @@ interface Props {
   name: string
   category: string
   size?: number
+  imageUrl?: string
 }
 
-export default function ProductImage({ name, category, size = 64 }: Props) {
-  const [url, setUrl] = useState<string | null | undefined>(undefined)
+export default function ProductImage({ name, category, size = 64, imageUrl }: Props) {
+  const [url, setUrl] = useState<string | null | undefined>(imageUrl ?? undefined)
   const [loadKey, setLoadKey] = useState(0)
   const emoji = CATEGORY_EMOJI[category] ?? '📦'
 
   useEffect(() => {
+    // A manually-assigned photo always wins — skip all keyword guessing.
+    if (imageUrl) { setUrl(imageUrl); return }
     if (shouldSkipImage(name)) { setUrl(null); return }
     const local = getLocalImage(name)
     if (local) { setUrl(local); return }
@@ -314,7 +317,7 @@ export default function ProductImage({ name, category, size = 64 }: Props) {
     if (imageCache.has(key)) { setUrl(imageCache.get(key)!); return }
     // Check community photos then AI fallback
     resolveImage(name, category).then(setUrl)
-  }, [name, category])
+  }, [name, category, imageUrl])
 
   const style = { width: size, height: size, minWidth: size, minHeight: size }
 
@@ -343,7 +346,10 @@ export default function ProductImage({ name, category, size = 64 }: Props) {
           if (loadKey < 2) {
             setLoadKey(k => k + 1)
           } else {
-            imageCache.set(`${CACHE_VERSION}:${name.toLowerCase()}`, null)
+            // Only pollute the shared name-based cache for keyword-guessed
+            // images — a manually-assigned photo failing shouldn't affect
+            // other items that happen to share this item's name.
+            if (!imageUrl) imageCache.set(`${CACHE_VERSION}:${name.toLowerCase()}`, null)
             setUrl(null)
           }
         }}

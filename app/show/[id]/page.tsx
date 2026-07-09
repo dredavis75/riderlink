@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Send, Copy, CheckCircle2, AlertCircle,
   MessageSquare, Edit3, ExternalLink, Loader2, Zap, Download, Sparkles, Trash2,
-  Calendar, Phone, Mail, Shield, Music, DollarSign, Wrench, FileText, Clock, Users, XCircle, PauseCircle, X, RotateCcw, Plus, MapPin, Building2, Plane,
+  Calendar, Phone, Mail, Shield, Music, DollarSign, Wrench, FileText, Clock, Users, XCircle, PauseCircle, X, RotateCcw, Plus, MapPin, Building2, Plane, ImagePlus,
 } from 'lucide-react'
 import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, FLIGHT_CLASS_LABELS, type RiderItem, type ItemStatus, type Show, type FlightClass } from '@/lib/data'
 import {
   getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, updateShowVenue, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact,
   addHotel, updateHotel, deleteHotel, addRoomingEntry, updateRoomingEntry, deleteRoomingEntry, addFlight, updateFlight, deleteFlight, updateShowTravelFlags,
 } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
 import ProductImage from '@/app/components/ProductImage'
 import VenueMap from '@/app/components/VenueMap'
@@ -73,6 +74,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [editValue, setEditValue]           = useState('')
   const [editQuantity, setEditQuantity]     = useState('')
   const [editNotes, setEditNotes]           = useState('')
+  const [uploadingItemImageId, setUploadingItemImageId] = useState<string | null>(null)
   const [editingCategory, setEditingCategory] = useState<string | null>(null)
   const [addingItemTo, setAddingItemTo]     = useState<string | null>(null)
   const [newItemName, setNewItemName]       = useState('')
@@ -210,6 +212,22 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
       setAddingItemTo(null)
       setNewItemName(''); setNewItemQuantity(''); setNewItemNotes('')
     } catch { /* keep form open on failure */ }
+  }
+
+  async function handleUploadItemImage(itemId: string, file: File) {
+    setUploadingItemImageId(itemId)
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+      const path = `item-overrides/${itemId}-${Date.now()}.${ext}`
+      const { error: uploadErr } = await supabase.storage
+        .from('rider-photos')
+        .upload(path, file, { contentType: file.type, upsert: true })
+      if (uploadErr) throw uploadErr
+      const { data: urlData } = supabase.storage.from('rider-photos').getPublicUrl(path)
+      await updateItem(itemId, { image_url: urlData.publicUrl })
+      setShow(prev => prev ? { ...prev, items: prev.items.map(i => i.id === itemId ? { ...i, imageUrl: urlData.publicUrl } : i) } : prev)
+    } catch { /* leave existing image in place on failure */ }
+    setUploadingItemImageId(null)
   }
 
   async function saveCategory(oldCategory: string) {
@@ -846,7 +864,16 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                       return (
                         <div key={item.id} className={`px-5 py-4 ${item.status === 'unavailable' ? 'bg-red-50' : item.status === 'substituted' ? 'bg-blue-50' : ''}`}>
                           <div className="flex items-start justify-between gap-3">
-                            <ProductImage name={item.name} category={item.category} size={80} />
+                            <label className="relative shrink-0 cursor-pointer group/img" title="Set a photo for this item">
+                              <ProductImage name={item.name} category={item.category} imageUrl={item.imageUrl} size={80} />
+                              <div className="absolute inset-0 rounded-xl bg-black/0 group-hover/img:bg-black/40 transition-colors flex items-center justify-center">
+                                {uploadingItemImageId === item.id
+                                  ? <Loader2 size={18} className="animate-spin text-white" />
+                                  : <ImagePlus size={18} className="text-white opacity-0 group-hover/img:opacity-100 transition-opacity" />}
+                              </div>
+                              <input type="file" accept="image/*" className="hidden"
+                                onChange={e => { if (e.target.files?.[0]) handleUploadItemImage(item.id, e.target.files[0]); e.target.value = '' }} />
+                            </label>
                             <div className="flex-1 min-w-0">
                               {editingItem === item.id ? (
                                 <div className="space-y-1.5">

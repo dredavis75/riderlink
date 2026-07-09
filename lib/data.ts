@@ -8,6 +8,7 @@ export interface RiderItem {
   notes: string
   status: ItemStatus
   buyerNote: string
+  imageUrl?: string
 }
 
 export interface Message {
@@ -128,6 +129,7 @@ export interface MasterRiderItem {
   quantity: string
   notes: string
   sortOrder: number
+  imageUrl?: string
 }
 
 export interface MasterRider {

@@ -20,8 +20,9 @@ import { supabase } from '@/lib/supabase'
 import { PDFDocument } from 'pdf-lib'
 import { isConfigured } from '@/lib/supabase'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
+import ProductImage from '@/app/components/ProductImage'
 
-type LocalItem = { id: string; category: string; name: string; quantity: string; notes: string; sortOrder: number; masterId: string }
+type LocalItem = { id: string; category: string; name: string; quantity: string; notes: string; sortOrder: number; masterId: string; imageUrl?: string }
 
 function nextVersion(v: string) {
   const [major, minor] = v.split('.').map(Number)
@@ -71,6 +72,7 @@ export default function RiderLibrary() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
   const [editItems, setEditItems] = useState<LocalItem[]>([])
+  const [uploadingItemImageId, setUploadingItemImageId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [uploadingPdf, setUploadingPdf] = useState<string | null>(null)
@@ -120,6 +122,23 @@ export default function RiderLibrary() {
       setAddingContact(null)
     } catch (e) { console.error('addContact:', e) }
     setSavingContact(false)
+  }
+
+  async function handleUploadItemImage(itemId: string, file: File) {
+    setUploadingItemImageId(itemId)
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+      const path = `item-overrides/${itemId}-${Date.now()}.${ext}`
+      const { error: uploadErr } = await supabase.storage
+        .from('rider-photos')
+        .upload(path, file, { contentType: file.type, upsert: true })
+      if (uploadErr) throw uploadErr
+      const { data: urlData } = supabase.storage.from('rider-photos').getPublicUrl(path)
+      await updateMasterItem(itemId, { imageUrl: urlData.publicUrl })
+      setEditItems(prev => prev.map(i => i.id === itemId ? { ...i, imageUrl: urlData.publicUrl } : i))
+      await load(workspaceId)
+    } catch { /* leave existing image in place on failure */ }
+    setUploadingItemImageId(null)
   }
 
   async function handleUploadPhoto() {
@@ -479,6 +498,16 @@ export default function RiderLibrary() {
                             <div key={item.id} className="px-5 py-3">
                               {isEditing ? (
                                 <div className="flex gap-2 items-start">
+                                  <label className="relative shrink-0 cursor-pointer group/img" title="Set a photo for this item">
+                                    <ProductImage name={item.name} category={item.category} imageUrl={item.imageUrl} size={44} />
+                                    <div className="absolute inset-0 rounded-xl bg-black/0 group-hover/img:bg-black/40 transition-colors flex items-center justify-center">
+                                      {uploadingItemImageId === item.id
+                                        ? <Loader2 size={14} className="animate-spin text-white" />
+                                        : <ImagePlus size={14} className="text-white opacity-0 group-hover/img:opacity-100 transition-opacity" />}
+                                    </div>
+                                    <input type="file" accept="image/*" className="hidden"
+                                      onChange={e => { if (e.target.files?.[0]) handleUploadItemImage(item.id, e.target.files[0]); e.target.value = '' }} />
+                                  </label>
                                   <div className="flex-1 grid grid-cols-[1fr_120px_1fr] gap-2">
                                     <input
                                       value={item.name}
@@ -508,9 +537,12 @@ export default function RiderLibrary() {
                                 </div>
                               ) : (
                                 <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <span className="text-sm font-medium text-gray-900">{item.name}</span>
-                                    {item.notes && <span className="text-xs text-gray-400"> · {item.notes}</span>}
+                                  <div className="flex items-start gap-3">
+                                    <ProductImage name={item.name} category={item.category} imageUrl={item.imageUrl} size={36} />
+                                    <div>
+                                      <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                                      {item.notes && <span className="text-xs text-gray-400"> · {item.notes}</span>}
+                                    </div>
                                   </div>
                                   <span className="text-xs text-gray-400 shrink-0">{item.quantity}</span>
                                 </div>

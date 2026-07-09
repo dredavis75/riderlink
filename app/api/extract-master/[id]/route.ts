@@ -193,6 +193,18 @@ export async function POST(
     }))
 
     // ── Save to DB ────────────────────────────────────────────────────────────
+    // Preserve manually-assigned photos across re-extraction by carrying over
+    // image_url for any item whose name matches an existing one exactly —
+    // otherwise every re-extract would silently wipe out photo overrides.
+    const { data: existingItems } = await sb
+      .from('rider_master_items')
+      .select('name, image_url')
+      .eq('master_id', masterId)
+    const imageByName = new Map<string, string>()
+    for (const row of existingItems ?? []) {
+      if (row.image_url) imageByName.set(row.name.trim().toLowerCase(), row.image_url)
+    }
+
     await sb.from('rider_master_items').delete().eq('master_id', masterId)
 
     const { error: insertErr } = await sb.from('rider_master_items').insert(
@@ -203,6 +215,7 @@ export async function POST(
         quantity: item.quantity,
         notes: item.notes,
         sort_order: idx,
+        image_url: imageByName.get(item.name.trim().toLowerCase()) ?? null,
       }))
     )
 
