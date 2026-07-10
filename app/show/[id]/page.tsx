@@ -159,6 +159,8 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [editFlightDestination, setEditFlightDestination] = useState('')
   const [editFlightDate, setEditFlightDate] = useState('')
   const [editFlightClass, setEditFlightClass] = useState<FlightClass>('coach')
+  const [lookingUpFlight, setLookingUpFlight] = useState(false)
+  const [flightLookupError, setFlightLookupError] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -524,6 +526,25 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   async function handleDeleteRoom(id: string) {
     setShow(prev => prev ? { ...prev, roomingList: prev.roomingList.filter(r => r.id !== id) } : prev)
     try { await deleteRoomingEntry(id) } catch {}
+  }
+
+  async function lookupNewFlight() {
+    if (!newFlightAirline.trim() || !newFlightNumber.trim()) return
+    setLookingUpFlight(true)
+    setFlightLookupError('')
+    try {
+      const params = new URLSearchParams({ airline: newFlightAirline.trim(), flightNumber: newFlightNumber.trim() })
+      if (newFlightDate) params.set('date', newFlightDate)
+      const res = await fetch(`/api/flight-lookup?${params.toString()}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Flight not found')
+      setNewFlightOrigin(data.originCode ? `${data.origin} (${data.originCode})` : data.origin)
+      setNewFlightDestination(data.destinationCode ? `${data.destination} (${data.destinationCode})` : data.destination)
+      if (data.date) setNewFlightDate(data.date)
+    } catch (e: any) {
+      setFlightLookupError(e?.message ?? 'Could not find that flight')
+    }
+    setLookingUpFlight(false)
   }
 
   async function handleAddFlight() {
@@ -1436,9 +1457,16 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                   <div className="flex gap-1.5">
                     <input value={newFlightAirline} onChange={e => setNewFlightAirline(e.target.value)} placeholder="Airline"
                       className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                    <input value={newFlightNumber} onChange={e => setNewFlightNumber(e.target.value)} placeholder="Flight #"
+                    <input value={newFlightNumber} onChange={e => setNewFlightNumber(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && lookupNewFlight()}
+                      placeholder="Flight #"
                       className="w-24 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                    <button onClick={lookupNewFlight} disabled={lookingUpFlight || !newFlightAirline.trim() || !newFlightNumber.trim()}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-gray-950 disabled:opacity-40 transition-colors shrink-0">
+                      {lookingUpFlight ? <Loader2 size={12} className="animate-spin" /> : 'Look Up'}
+                    </button>
                   </div>
+                  {flightLookupError && <p className="text-xs text-red-600">{flightLookupError}</p>}
                   <div className="flex gap-1.5">
                     <input value={newFlightOrigin} onChange={e => setNewFlightOrigin(e.target.value)} placeholder="From"
                       className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
@@ -1455,7 +1483,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={handleAddFlight} disabled={!newFlightPassenger.trim()} className="text-sm font-bold text-emerald-700 disabled:opacity-40">Add Flight</button>
-                    <button onClick={() => { setAddingFlight(false); setNewFlightPassenger(''); setNewFlightAirline(''); setNewFlightNumber(''); setNewFlightOrigin(''); setNewFlightDestination(''); setNewFlightDate(''); setNewFlightClass('coach') }} className="text-sm text-gray-500">Cancel</button>
+                    <button onClick={() => { setAddingFlight(false); setNewFlightPassenger(''); setNewFlightAirline(''); setNewFlightNumber(''); setNewFlightOrigin(''); setNewFlightDestination(''); setNewFlightDate(''); setNewFlightClass('coach'); setFlightLookupError('') }} className="text-sm text-gray-500">Cancel</button>
                   </div>
                 </div>
               ) : (
