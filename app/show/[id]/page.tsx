@@ -7,7 +7,7 @@ import {
   MessageSquare, Edit3, ExternalLink, Loader2, Zap, Download, Sparkles, Trash2,
   Calendar, Phone, Mail, Shield, Music, DollarSign, Wrench, FileText, Clock, Users, XCircle, PauseCircle, X, RotateCcw, Plus, MapPin, Building2, Plane, ImagePlus,
 } from 'lucide-react'
-import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, FLIGHT_CLASS_LABELS, type RiderItem, type ItemStatus, type Show, type FlightClass } from '@/lib/data'
+import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, FLIGHT_CLASS_LABELS, type RiderItem, type ItemStatus, type Show, type FlightClass, type Hotel } from '@/lib/data'
 import {
   getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, updateShowVenue, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact,
   addHotel, updateHotel, deleteHotel, deleteRoomingGuest, addFlight, updateFlight, deleteFlight, updateShowTravelFlags,
@@ -548,14 +548,24 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
     try { await deleteFlight(id) } catch {}
   }
 
+  function milesBetween(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 3958.8 // miles
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
   function distanceFromVenue(lat?: number, lng?: number): string | null {
     if (!show?.venueLat || !show?.venueLng || lat == null || lng == null) return null
-    const R = 3958.8 // miles
-    const dLat = (lat - show.venueLat) * Math.PI / 180
-    const dLng = (lng - show.venueLng) * Math.PI / 180
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(show.venueLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2
-    const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    return `${d.toFixed(1)} mi from venue`
+    return `${milesBetween(lat, lng, show.venueLat, show.venueLng).toFixed(1)} mi from venue`
+  }
+
+  function distancesToOtherHotels(hotel: Hotel): { name: string; miles: string }[] {
+    if (hotel.lat == null || hotel.lng == null) return []
+    return show?.hotels
+      .filter(h => h.id !== hotel.id && h.lat != null && h.lng != null)
+      .map(h => ({ name: h.name, miles: milesBetween(hotel.lat!, hotel.lng!, h.lat!, h.lng!).toFixed(1) })) ?? []
   }
 
   return (
@@ -1186,6 +1196,9 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                           </div>
                           {hotel.address && <p className="text-xs text-gray-500 mt-0.5">{hotel.address}</p>}
                           {distanceFromVenue(hotel.lat, hotel.lng) && <p className="text-xs text-amber-700 font-semibold mt-0.5">{distanceFromVenue(hotel.lat, hotel.lng)}</p>}
+                          {distancesToOtherHotels(hotel).map(d => (
+                            <p key={d.name} className="text-xs text-gray-500 mt-0.5">{d.miles} mi from {d.name}</p>
+                          ))}
                         </div>
                         <button onClick={() => handleDeleteHotel(hotel.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0">
                           <Trash2 size={13} />
@@ -1208,6 +1221,11 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
 
               {addingHotel ? (
                 <div className="space-y-1.5 border border-amber-200 rounded-xl p-3 bg-amber-50">
+                  {show.hotels.length > 0 && (
+                    <p className="text-xs text-amber-700 font-semibold">
+                      This hotel gets its own rooming list — shown as {PARTY_LABELS[show.hotels.length] ?? show.hotels.length + 1} Party.
+                    </p>
+                  )}
                   <div className="relative" ref={hotelDropdownRef}>
                     <div className="relative">
                       <input
@@ -1253,13 +1271,18 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                     <p className="text-xs text-emerald-700 flex items-center gap-1"><MapPin size={11} /> Location found — will show on the map</p>
                   )}
                   <div className="flex gap-2">
-                    <button onClick={handleAddHotel} disabled={!newHotelName.trim()} className="text-sm font-bold text-emerald-700 disabled:opacity-40">Add Hotel</button>
+                    <button onClick={handleAddHotel} disabled={!newHotelName.trim()} className="text-sm font-bold text-emerald-700 disabled:opacity-40">
+                      {show.hotels.length > 0 ? `Add Hotel (${PARTY_LABELS[show.hotels.length] ?? show.hotels.length + 1} Party)` : 'Add Hotel'}
+                    </button>
                     <button onClick={() => { setAddingHotel(false); setNewHotelName(''); setNewHotelAddress(''); setNewHotelLat(null); setNewHotelLng(null); setHotelError('') }} className="text-sm text-gray-500">Cancel</button>
                   </div>
                 </div>
               ) : (
                 <button onClick={() => setAddingHotel(true)} className="flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 transition-colors">
-                  <Plus size={13} /> Add Hotel
+                  <Plus size={13} />
+                  {show.hotels.length > 0
+                    ? `Add Another Hotel — ${PARTY_LABELS[show.hotels.length] ?? show.hotels.length + 1} Party`
+                    : 'Add Hotel'}
                 </button>
               )}
 
