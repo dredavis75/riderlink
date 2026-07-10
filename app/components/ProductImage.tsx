@@ -127,7 +127,7 @@ export default function ProductImage({ name, category, size = 64, imageUrl }: Pr
         alt={name}
         width={size}
         height={size}
-        className="object-contain w-full h-full"
+        className="object-cover w-full h-full"
         onError={() => {
           if (loadKey < 2) {
             setLoadKey(k => k + 1)
