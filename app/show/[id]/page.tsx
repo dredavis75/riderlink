@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, use } from 'react'
+import { useState, useEffect, useCallback, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Send, Copy, CheckCircle2, AlertCircle,
@@ -122,6 +122,11 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [editingHotelId, setEditingHotelId] = useState<string | null>(null)
   const [editHotelName, setEditHotelName] = useState('')
   const [editHotelAddress, setEditHotelAddress] = useState('')
+  const [hotelPredictions, setHotelPredictions] = useState<{ placeId: string; name: string; secondary: string }[]>([])
+  const [searchingHotels, setSearchingHotels] = useState(false)
+  const [showHotelDropdown, setShowHotelDropdown] = useState(false)
+  const hotelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hotelDropdownRef = useRef<HTMLDivElement>(null)
 
   // Rooming list
   const [addingRoom, setAddingRoom] = useState(false)
@@ -171,6 +176,14 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
     const unsub = subscribeToShow(id, load)
     return unsub
   }, [id, load])
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (hotelDropdownRef.current && !hotelDropdownRef.current.contains(e.target as Node)) setShowHotelDropdown(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   if (!show) return <div className="p-8 text-gray-500">Show not found.</div>
 
@@ -403,6 +416,34 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
     const next = !show.buyerCoversFlights
     setShow(prev => prev ? { ...prev, buyerCoversFlights: next } : prev)
     try { await updateShowTravelFlags(show.id, { buyerCoversFlights: next }) } catch {}
+  }
+
+  function searchHotels(q: string) {
+    if (hotelDebounceRef.current) clearTimeout(hotelDebounceRef.current)
+    if (q.length < 2) { setHotelPredictions([]); setShowHotelDropdown(false); return }
+    hotelDebounceRef.current = setTimeout(async () => {
+      setSearchingHotels(true)
+      try {
+        const res = await fetch(`/api/places?q=${encodeURIComponent(q)}&type=lodging`)
+        const data = await res.json()
+        setHotelPredictions(data.predictions ?? [])
+        setShowHotelDropdown(true)
+      } catch {}
+      setSearchingHotels(false)
+    }, 300)
+  }
+
+  async function selectHotelPrediction(p: { placeId: string; name: string; secondary: string }) {
+    setNewHotelName(p.name)
+    setShowHotelDropdown(false)
+    setHotelPredictions([])
+    try {
+      const res = await fetch(`/api/places?placeId=${p.placeId}`)
+      const data = await res.json()
+      if (data.address) setNewHotelAddress(data.address)
+      setNewHotelLat(typeof data.lat === 'number' ? data.lat : null)
+      setNewHotelLng(typeof data.lng === 'number' ? data.lng : null)
+    } catch {}
   }
 
   async function lookupNewHotelAddress() {
@@ -1174,8 +1215,36 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
 
               {addingHotel ? (
                 <div className="space-y-1.5 border border-amber-200 rounded-xl p-3 bg-amber-50">
-                  <input value={newHotelName} onChange={e => setNewHotelName(e.target.value)} placeholder="Hotel name" autoFocus
-                    className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                  <div className="relative" ref={hotelDropdownRef}>
+                    <div className="relative">
+                      <input
+                        value={newHotelName}
+                        onChange={e => { setNewHotelName(e.target.value); setNewHotelLat(null); setNewHotelLng(null); searchHotels(e.target.value) }}
+                        onFocus={() => hotelPredictions.length > 0 && setShowHotelDropdown(true)}
+                        placeholder="Start typing a hotel name…"
+                        autoComplete="off"
+                        autoFocus
+                        className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 pr-8 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                      {searchingHotels
+                        ? <Loader2 size={13} className="absolute right-2.5 top-2 animate-spin text-gray-400" />
+                        : <MapPin size={13} className="absolute right-2.5 top-2 text-gray-300" />
+                      }
+                    </div>
+                    {showHotelDropdown && hotelPredictions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-amber-200 rounded-xl shadow-2xl overflow-hidden">
+                        {hotelPredictions.map(p => (
+                          <button
+                            key={p.placeId}
+                            onMouseDown={() => selectHotelPrediction(p)}
+                            className="w-full text-left px-3 py-2 hover:bg-amber-50 transition-colors border-b border-amber-100 last:border-0"
+                          >
+                            <div className="text-sm font-semibold text-gray-900">{p.name}</div>
+                            {p.secondary && <div className="text-xs text-gray-500 mt-0.5">{p.secondary}</div>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex gap-2">
                     <input value={newHotelAddress} onChange={e => { setNewHotelAddress(e.target.value); setNewHotelLat(null); setNewHotelLng(null) }}
                       onKeyDown={e => e.key === 'Enter' && lookupNewHotelAddress()}

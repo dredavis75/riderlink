@@ -69,10 +69,11 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // Autocomplete — search venues by name or city
+  // Autocomplete — search venues (or hotels, via type=lodging) by name or city
   if (!q || q.length < 2) return NextResponse.json({ predictions: [] })
 
-  const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(q)}&types=establishment&key=${KEY}`
+  const placeType = req.nextUrl.searchParams.get('type') === 'lodging' ? 'lodging' : 'establishment'
+  const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(q)}&types=${placeType}&key=${KEY}`
   const res = await fetch(url)
   const data = await res.json()
 
