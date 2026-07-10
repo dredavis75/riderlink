@@ -261,6 +261,11 @@ export async function updateShowVenue(
   if (error) throw error
 }
 
+export async function deleteShow(showId: string): Promise<void> {
+  const { error } = await supabase.from('shows').delete().eq('id', showId)
+  if (error) throw error
+}
+
 // ── Rider Items ───────────────────────────────────────────────────────────────
 
 export async function deleteShowItem(itemId: string): Promise<void> {

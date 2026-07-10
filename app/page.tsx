@@ -6,10 +6,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   MapPin, AlertCircle, Bell, Plus, TrendingUp,
-  Loader2, BookOpen, Zap, Music2, Download, FileUp, Trash2, Pencil, RefreshCw, LogOut,
+  Loader2, BookOpen, Zap, Music2, Download, FileUp, Trash2, Pencil, RefreshCw, LogOut, X,
 } from 'lucide-react'
 import { MOCK_SHOWS, SHOW_STATUS_CONFIG, type Show, type RiderPdfSection } from '@/lib/data'
-import { getShows, subscribeToAllShows, getSectionsForShows, addSection, deleteSection, updateSectionLabel, createShow } from '@/lib/db'
+import { getShows, subscribeToAllShows, getSectionsForShows, addSection, deleteSection, updateSectionLabel, createShow, deleteShow } from '@/lib/db'
 import { supabase, isConfigured } from '@/lib/supabase'
 import NewShowModal from '@/app/components/NewShowModal'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
@@ -76,11 +76,13 @@ function ShowCard({
   sections,
   onClick,
   onSectionsChanged,
+  onDeleteClick,
 }: {
   show: Show
   sections: RiderPdfSection[]
   onClick: () => void
   onSectionsChanged: (showId: string, sections: RiderPdfSection[]) => void
+  onDeleteClick: () => void
 }) {
   const counts    = statusCounts(show)
   const hasIssues = counts.unavailable > 0 || counts.substituted > 0
@@ -140,6 +142,14 @@ function ShowCard({
       onDragLeave={() => setDragging(false)}
       onDrop={e => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files) }}
     >
+      <button
+        onClick={e => { e.stopPropagation(); onDeleteClick() }}
+        className="absolute top-3 right-3 z-10 p-1.5 rounded-lg bg-white border border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 transition-all shadow-sm"
+        title="Delete this show"
+      >
+        <Trash2 size={13} />
+      </button>
+
       {/* Clickable main area */}
       <button onClick={onClick} className="w-full text-left p-5">
         <div className="flex items-center justify-between mb-4">
@@ -305,6 +315,8 @@ export default function Dashboard() {
   const [showGuide, setShowGuide]         = useState(false)
   const [workspaceId, setWsId]           = useState<string>('default')
   const [companyName, setCompanyName]    = useState(DEFAULT_COMPANY)
+  const [deleteShowModal, setDeleteShowModal] = useState<{ id: string; artist: string; venue: string } | null>(null)
+  const [deletingShow, setDeletingShow]       = useState(false)
 
   const load = useCallback(async (wsId: string) => {
     try {
@@ -335,6 +347,17 @@ export default function Dashboard() {
 
   function handleSectionsChanged(showId: string, next: RiderPdfSection[]) {
     setSections(prev => ({ ...prev, [showId]: next }))
+  }
+
+  async function handleDeleteShow() {
+    if (!deleteShowModal) return
+    setDeletingShow(true)
+    try {
+      await deleteShow(deleteShowModal.id)
+      await load(workspaceId)
+      setDeleteShowModal(null)
+    } catch { /* leave modal open so the user can retry */ }
+    setDeletingShow(false)
   }
 
   async function handleImportDates(dates: TourDate[]) {
@@ -487,6 +510,7 @@ export default function Dashboard() {
                 sections={sections[show.id] ?? []}
                 onClick={() => router.push(`/show/${show.id}`)}
                 onSectionsChanged={handleSectionsChanged}
+                onDeleteClick={() => setDeleteShowModal({ id: show.id, artist: show.artist, venue: show.venue })}
               />
             </div>
           ))}
@@ -508,6 +532,34 @@ export default function Dashboard() {
           existingShows={shows.map(s => ({ artist: s.artist, date: s.date, venue: s.venue }))}
           onImport={handleImportDates}
         />
+      )}
+
+      {/* Delete show confirm modal */}
+      {deleteShowModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-base font-black text-gray-900">Delete this show?</h3>
+              <button onClick={() => setDeleteShowModal(null)} className="p-1 rounded-lg hover:bg-gray-100 transition-colors shrink-0">
+                <X size={16} className="text-gray-500" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              This permanently deletes {deleteShowModal.artist} at {deleteShowModal.venue} — including its rider items, messages, hotels, flights, and rider docs. This can&apos;t be undone.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteShowModal(null)}
+                className="flex-1 text-sm font-bold px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">
+                Never mind
+              </button>
+              <button onClick={handleDeleteShow} disabled={deletingShow}
+                className="flex-1 flex items-center justify-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl text-white disabled:opacity-50 transition-colors bg-red-600 hover:bg-red-500">
+                {deletingShow ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Yes, Delete It
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
