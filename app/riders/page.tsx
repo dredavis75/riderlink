@@ -11,7 +11,7 @@ import {
 } from '@/lib/data'
 import {
   getRiderMasters, addMasterItem,
-  updateMasterItem, deleteMasterItem, bumpMasterVersion, saveMasterPdfUrl,
+  updateMasterItem, deleteMasterItem, deleteMasterRider, bumpMasterVersion, saveMasterPdfUrl,
   getAllManagementContacts, addManagementContact, updateManagementContact, deleteManagementContact,
   type ManagementContact,
   getCommunityPhotos, updateCommunityPhoto, deleteCommunityPhoto, type CommunityPhoto,
@@ -75,6 +75,8 @@ export default function RiderLibrary() {
   const [editItems, setEditItems] = useState<LocalItem[]>([])
   const [uploadingItemImageId, setUploadingItemImageId] = useState<string | null>(null)
   const [itemImageMsg, setItemImageMsg] = useState<{ id: string; ok: boolean } | null>(null)
+  const [deleteMasterModal, setDeleteMasterModal] = useState<{ id: string; artist: string } | null>(null)
+  const [deletingMaster, setDeletingMaster] = useState(false)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [uploadingPdf, setUploadingPdf] = useState<string | null>(null)
@@ -150,6 +152,17 @@ export default function RiderLibrary() {
     }
     setUploadingItemImageId(null)
     setTimeout(() => setItemImageMsg(prev => (prev?.id === itemId ? null : prev)), 2500)
+  }
+
+  async function handleDeleteMaster() {
+    if (!deleteMasterModal) return
+    setDeletingMaster(true)
+    try {
+      await deleteMasterRider(deleteMasterModal.id)
+      await load(workspaceId)
+      setDeleteMasterModal(null)
+    } catch { /* leave modal open so the user can retry */ }
+    setDeletingMaster(false)
   }
 
   async function loadCommunityPhotoList() {
@@ -422,6 +435,15 @@ export default function RiderLibrary() {
                       className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl border border-amber-400 text-amber-700 hover:bg-amber-50 transition-colors"
                     >
                       <Edit3 size={13} /> Edit
+                    </button>
+                  )}
+                  {!isEditing && isConfigured && (
+                    <button
+                      onClick={() => setDeleteMasterModal({ id: master.id, artist: master.artist })}
+                      className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
+                      title="Delete this artist's master rider"
+                    >
+                      <Trash2 size={13} />
                     </button>
                   )}
                   {!isEditing && (
@@ -820,6 +842,35 @@ export default function RiderLibrary() {
                 className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-gray-950 font-black text-sm py-3 rounded-xl transition-all"
               >
                 {uploadingPhoto ? <Loader2 size={15} className="animate-spin" /> : <><Upload size={15} /> Upload to Library</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete master rider confirm modal */}
+      {deleteMasterModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-base font-black text-gray-900">Delete {deleteMasterModal.artist}&apos;s rider?</h3>
+              <button onClick={() => setDeleteMasterModal(null)} className="p-1 rounded-lg hover:bg-gray-100 transition-colors shrink-0">
+                <X size={16} className="text-gray-500" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              This permanently deletes the master rider and all its items for {deleteMasterModal.artist} — including any photos you&apos;ve pinned to items.
+              Shows already created from it keep their own copy of the rider and aren&apos;t affected, but you won&apos;t be able to &quot;Reset to Latest Rider&quot; on them anymore, and there&apos;ll be nothing to auto-populate new shows for this artist. This can&apos;t be undone.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteMasterModal(null)}
+                className="flex-1 text-sm font-bold px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">
+                Never mind
+              </button>
+              <button onClick={handleDeleteMaster} disabled={deletingMaster}
+                className="flex-1 flex items-center justify-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl text-white disabled:opacity-50 transition-colors bg-red-600 hover:bg-red-500">
+                {deletingMaster ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Yes, Delete It
               </button>
             </div>
           </div>

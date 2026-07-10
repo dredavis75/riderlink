@@ -476,6 +476,35 @@ export async function deleteMasterItem(itemId: string): Promise<void> {
   if (error) throw error
 }
 
+export async function deleteMasterRider(masterId: string): Promise<void> {
+  const { error } = await supabase.from('rider_masters').delete().eq('id', masterId)
+  if (error) throw error
+}
+
+// Best-effort: when a photo is set on a show's rider item, also pin it on
+// the matching master rider item (by name) so it's the permanent default
+// for that artist going forward — no-ops if there's no master or no
+// matching item, since not every show item exists on the master template.
+export async function propagateItemImageToMaster(
+  artist: string,
+  itemName: string,
+  imageUrl: string,
+  workspaceId = 'default'
+): Promise<void> {
+  const { data: master } = await supabase
+    .from('rider_masters')
+    .select('id, rider_master_items(id, name)')
+    .eq('artist', artist)
+    .eq('workspace_id', workspaceId)
+    .single()
+  if (!master) return
+  const match = (master.rider_master_items as any[] ?? []).find(
+    (i) => i.name.trim().toLowerCase() === itemName.trim().toLowerCase()
+  )
+  if (!match) return
+  await supabase.from('rider_master_items').update({ image_url: imageUrl }).eq('id', match.id)
+}
+
 export async function bumpMasterVersion(masterId: string, newVersion: string): Promise<void> {
   const { error } = await supabase
     .from('rider_masters')

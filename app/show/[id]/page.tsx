@@ -11,6 +11,7 @@ import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, FLI
 import {
   getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, updateShowVenue, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact,
   addHotel, updateHotel, deleteHotel, addRoomingEntry, updateRoomingEntry, deleteRoomingEntry, addFlight, updateFlight, deleteFlight, updateShowTravelFlags,
+  propagateItemImageToMaster,
 } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
@@ -215,7 +216,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
     } catch { /* keep form open on failure */ }
   }
 
-  async function handleUploadItemImage(itemId: string, file: File) {
+  async function handleUploadItemImage(itemId: string, itemName: string, file: File) {
     setUploadingItemImageId(itemId)
     setItemImageMsg(null)
     try {
@@ -228,6 +229,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
       const { data: urlData } = supabase.storage.from('rider-photos').getPublicUrl(path)
       await updateItem(itemId, { image_url: urlData.publicUrl })
       setShow(prev => prev ? { ...prev, items: prev.items.map(i => i.id === itemId ? { ...i, imageUrl: urlData.publicUrl } : i) } : prev)
+      if (show) propagateItemImageToMaster(show.artist, itemName, urlData.publicUrl).catch(() => {})
       setItemImageMsg({ id: itemId, ok: true })
     } catch {
       setItemImageMsg({ id: itemId, ok: false })
@@ -883,7 +885,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                                 </div>
                               )}
                               <input type="file" accept="image/*" className="hidden"
-                                onChange={e => { if (e.target.files?.[0]) handleUploadItemImage(item.id, e.target.files[0]); e.target.value = '' }} />
+                                onChange={e => { if (e.target.files?.[0]) handleUploadItemImage(item.id, item.name, e.target.files[0]); e.target.value = '' }} />
                             </label>
                             <div className="flex-1 min-w-0">
                               {editingItem === item.id ? (
