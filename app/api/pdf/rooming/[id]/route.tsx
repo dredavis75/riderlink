@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { renderToBuffer, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import { getShow } from '@/lib/db'
-import { MOCK_SHOWS, ROOMING_BOOKING_STATUS_LABELS, type Show, type RoomingDay, type RoomingGuest, type RoomingParty, type RoomingBookingStatus } from '@/lib/data'
+import { MOCK_SHOWS, type Show, type Hotel } from '@/lib/data'
 import { isConfigured } from '@/lib/supabase'
 
-const DAYS_PER_PAGE = 5
-const NAME_COL_WIDTH = 130
-const DAY_COL_WIDTH = 100
+const PARTY_LABELS = ['A', 'B', 'C', 'D', 'E', 'F']
 
 const styles = StyleSheet.create({
   page: {
@@ -16,9 +14,9 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#111827',
-    paddingHorizontal: 32,
-    paddingTop: 28,
-    paddingBottom: 20,
+    paddingHorizontal: 40,
+    paddingTop: 32,
+    paddingBottom: 24,
   },
   headerLabel: {
     fontSize: 8,
@@ -28,7 +26,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   artistName: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: 'Helvetica-Bold',
     color: '#ffffff',
     letterSpacing: -0.5,
@@ -39,46 +37,22 @@ const styles = StyleSheet.create({
     color: '#d1d5db',
   },
   body: {
-    paddingHorizontal: 32,
+    paddingHorizontal: 40,
     paddingTop: 20,
   },
-  table: {
-    flexDirection: 'column',
+  hotelSection: {
+    marginBottom: 24,
   },
-  row: {
-    flexDirection: 'row',
-  },
-  headerCellWrap: {
-    width: NAME_COL_WIDTH,
-  },
-  dayCell: {
-    width: DAY_COL_WIDTH,
-    borderColor: '#e5e7eb',
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 6,
-    marginLeft: 6,
-  },
-  dayDate: {
-    fontSize: 9,
+  hotelName: {
+    fontSize: 13,
     fontFamily: 'Helvetica-Bold',
     color: '#111827',
-    textAlign: 'center',
   },
-  dayHotel: {
-    fontSize: 7,
+  hotelAddress: {
+    fontSize: 9,
     color: '#6b7280',
-    textAlign: 'center',
     marginTop: 2,
-  },
-  dayStatus: {
-    fontSize: 7,
-    fontFamily: 'Helvetica-Bold',
-    textAlign: 'center',
-    borderRadius: 3,
-    paddingVertical: 2,
-    marginTop: 3,
-    textTransform: 'uppercase',
+    marginBottom: 8,
   },
   partyLabel: {
     fontSize: 8,
@@ -86,36 +60,33 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     textTransform: 'uppercase',
     letterSpacing: 1.5,
-    marginTop: 16,
     marginBottom: 6,
   },
-  guestRow: {
+  tableHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    borderBottomColor: '#e5e7eb',
+    borderBottomWidth: 1,
+    paddingBottom: 4,
     marginBottom: 4,
   },
-  guestName: {
-    width: NAME_COL_WIDTH,
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-    color: '#111827',
-  },
-  guestConfirmation: {
+  tableHeaderText: {
     fontSize: 7,
-    fontFamily: 'Helvetica-Oblique',
+    fontFamily: 'Helvetica-Bold',
     color: '#9ca3af',
-    marginTop: 1,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  roomCell: {
-    width: DAY_COL_WIDTH,
-    fontSize: 8,
-    color: '#374151',
-    textAlign: 'center',
-    marginLeft: 6,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
     borderBottomColor: '#f3f4f6',
     borderBottomWidth: 1,
-    paddingVertical: 4,
   },
+  cellName: { width: 130, fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#111827' },
+  cellRoom: { width: 90, fontSize: 9, color: '#374151' },
+  cellDate: { width: 80, fontSize: 9, color: '#374151' },
+  cellConf: { flex: 1, fontSize: 8, fontFamily: 'Helvetica-Oblique', color: '#9ca3af' },
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -123,7 +94,7 @@ const styles = StyleSheet.create({
     right: 0,
     borderTopColor: '#e5e7eb',
     borderTopWidth: 1,
-    paddingHorizontal: 32,
+    paddingHorizontal: 40,
     paddingVertical: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -135,49 +106,33 @@ const styles = StyleSheet.create({
   },
 })
 
-const STATUS_STYLE: Record<RoomingBookingStatus, { bg: string; text: string }> = {
-  requested: { bg: '#fffbeb', text: '#b45309' },
-  confirmed: { bg: '#f0fdf4', text: '#15803d' },
-  need_approval: { bg: '#fff7ed', text: '#c2410c' },
-  unconfirmed: { bg: '#fef2f2', text: '#b91c1c' },
-}
+function HotelSection({ show, hotel, partyLabel }: { show: Show; hotel: Hotel; partyLabel: string }) {
+  const guests = show.roomingGuests
+    .filter(g => g.hotelId === hotel.id)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
 
-function fmtDate(date: string) {
-  return new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-}
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = []
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
-  return out
-}
-
-function PartyRows({
-  party, label, guests, days, show,
-}: {
-  party: RoomingParty
-  label: string
-  guests: RoomingGuest[]
-  days: RoomingDay[]
-  show: Show
-}) {
-  const rows = guests.filter(g => g.party === party).sort((a, b) => a.sortOrder - b.sortOrder)
-  if (rows.length === 0) return null
   return (
-    <View wrap={false}>
-      <Text style={styles.partyLabel}>{label} Party</Text>
-      {rows.map(guest => (
-        <View key={guest.id} style={styles.guestRow}>
-          <View style={styles.guestName}>
-            <Text>{guest.firstName} {guest.lastName}</Text>
-            {guest.confirmationNumber ? <Text style={styles.guestConfirmation}>Conf: {guest.confirmationNumber}</Text> : null}
-          </View>
-          {days.map(day => {
-            const assignment = show.roomingAssignments.find(a => a.guestId === guest.id && a.date === day.date)
-            return (
-              <Text key={day.id} style={styles.roomCell}>{assignment?.roomLabel || '—'}</Text>
-            )
-          })}
+    <View style={styles.hotelSection} wrap={false}>
+      <Text style={styles.hotelName}>{hotel.name}</Text>
+      {hotel.address ? <Text style={styles.hotelAddress}>{hotel.address}</Text> : null}
+      <Text style={styles.partyLabel}>{partyLabel} Party</Text>
+
+      {guests.length > 0 && (
+        <View style={styles.tableHeader}>
+          <Text style={[styles.tableHeaderText, { width: 130 }]}>Name</Text>
+          <Text style={[styles.tableHeaderText, { width: 90 }]}>Room Type</Text>
+          <Text style={[styles.tableHeaderText, { width: 80 }]}>Check-in</Text>
+          <Text style={[styles.tableHeaderText, { width: 80 }]}>Check-out</Text>
+          <Text style={[styles.tableHeaderText, { flex: 1 }]}>Confirmation #</Text>
+        </View>
+      )}
+      {guests.map(guest => (
+        <View key={guest.id} style={styles.row}>
+          <Text style={styles.cellName}>{guest.firstName} {guest.lastName}</Text>
+          <Text style={styles.cellRoom}>{guest.roomType || '—'}</Text>
+          <Text style={styles.cellDate}>{guest.checkinDate ?? '—'}</Text>
+          <Text style={styles.cellDate}>{guest.checkoutDate ?? '—'}</Text>
+          <Text style={styles.cellConf}>{guest.confirmationNumber ?? ''}</Text>
         </View>
       ))}
     </View>
@@ -185,48 +140,29 @@ function PartyRows({
 }
 
 function RoomingPDF({ show }: { show: Show }) {
-  const days = [...show.roomingDays].sort((a, b) => a.date.localeCompare(b.date))
-  const dayChunks = days.length > 0 ? chunk(days, DAYS_PER_PAGE) : [[]]
+  const hotels = [...show.hotels].sort((a, b) => a.sortOrder - b.sortOrder)
   const exportDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
   return (
     <Document title={`${show.artist} Rooming List — ${show.venue}`} author="RiderLink · Blue Alley Touring">
-      {dayChunks.map((dayChunk, pageIndex) => (
-        <Page key={pageIndex} size="A4" orientation="landscape" style={styles.page}>
-          <View style={styles.header}>
-            <Text style={styles.headerLabel}>Rooming List · RiderLink · Blue Alley Touring</Text>
-            <Text style={styles.artistName}>{show.artist}</Text>
-            <Text style={styles.showMeta}>{show.venue}  ·  {show.city}</Text>
-          </View>
+      <Page size="A4" style={styles.page}>
+        <View style={styles.header}>
+          <Text style={styles.headerLabel}>Rooming List · RiderLink · Blue Alley Touring</Text>
+          <Text style={styles.artistName}>{show.artist}</Text>
+          <Text style={styles.showMeta}>{show.venue}  ·  {show.city}</Text>
+        </View>
 
-          <View style={styles.body}>
-            <View style={styles.row}>
-              <View style={styles.headerCellWrap} />
-              {dayChunk.map(day => {
-                const hotel = show.hotels.find(h => h.id === day.hotelId)
-                const s = STATUS_STYLE[day.bookingStatus]
-                return (
-                  <View key={day.id} style={styles.dayCell}>
-                    <Text style={styles.dayDate}>{fmtDate(day.date)}</Text>
-                    <Text style={styles.dayHotel}>{hotel?.name ?? 'No hotel'}</Text>
-                    <Text style={[styles.dayStatus, { backgroundColor: s.bg, color: s.text }]}>
-                      {ROOMING_BOOKING_STATUS_LABELS[day.bookingStatus]}
-                    </Text>
-                  </View>
-                )
-              })}
-            </View>
+        <View style={styles.body}>
+          {hotels.map((hotel, i) => (
+            <HotelSection key={hotel.id} show={show} hotel={hotel} partyLabel={PARTY_LABELS[i] ?? String(i + 1)} />
+          ))}
+        </View>
 
-            <PartyRows party="A" label="A" guests={show.roomingGuests} days={dayChunk} show={show} />
-            <PartyRows party="B" label="B" guests={show.roomingGuests} days={dayChunk} show={show} />
-          </View>
-
-          <View style={styles.footer} fixed>
-            <Text style={styles.footerText}>RiderLink · Blue Alley Touring · {show.artist}</Text>
-            <Text style={styles.footerText}>Exported {exportDate}</Text>
-          </View>
-        </Page>
-      ))}
+        <View style={styles.footer} fixed>
+          <Text style={styles.footerText}>RiderLink · Blue Alley Touring · {show.artist}</Text>
+          <Text style={styles.footerText}>Exported {exportDate}</Text>
+        </View>
+      </Page>
     </Document>
   )
 }

@@ -10,14 +10,17 @@ import {
 import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, FLIGHT_CLASS_LABELS, type RiderItem, type ItemStatus, type Show, type FlightClass } from '@/lib/data'
 import {
   getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, updateShowVenue, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact,
-  addHotel, updateHotel, deleteHotel, addFlight, updateFlight, deleteFlight, updateShowTravelFlags,
+  addHotel, updateHotel, deleteHotel, deleteRoomingGuest, addFlight, updateFlight, deleteFlight, updateShowTravelFlags,
   propagateItemImageToMaster,
 } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
 import ProductImage from '@/app/components/ProductImage'
 import VenueMap from '@/app/components/VenueMap'
+import HotelVenueMap from '@/app/components/HotelVenueMap'
 import RoomingListEditor from '@/app/components/RoomingListEditor'
+
+const PARTY_LABELS = ['A', 'B', 'C', 'D', 'E', 'F']
 
 const ARTIST_COLORS: Record<string, string> = {
   'G Herbo':     'from-emerald-600 to-emerald-800',
@@ -478,12 +481,16 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   }
 
   async function handleDeleteHotel(id: string) {
+    const affectedGuestIds = (show?.roomingGuests ?? []).filter(g => g.hotelId === id).map(g => g.id)
     setShow(prev => prev ? {
       ...prev,
       hotels: prev.hotels.filter(h => h.id !== id),
-      roomingDays: prev.roomingDays.map(d => d.hotelId === id ? { ...d, hotelId: undefined } : d),
+      roomingGuests: prev.roomingGuests.filter(g => g.hotelId !== id),
     } : prev)
-    try { await deleteHotel(id) } catch {}
+    try {
+      await Promise.all(affectedGuestIds.map(gid => deleteRoomingGuest(gid)))
+      await deleteHotel(id)
+    } catch {}
   }
 
   async function lookupNewFlight() {
@@ -1155,7 +1162,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
 
               <div className="space-y-2 mb-4">
                 {show.hotels.length === 0 && !addingHotel && <p className="text-sm text-gray-400">No hotels added yet.</p>}
-                {show.hotels.map(hotel => (
+                {show.hotels.map((hotel, hotelIndex) => (
                   <div key={hotel.id} className="border border-amber-200 rounded-xl p-3 bg-amber-50">
                     {editingHotelId === hotel.id ? (
                       <div className="space-y-1.5">
@@ -1186,8 +1193,15 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                       </div>
                     )}
                     {hotel.lat != null && hotel.lng != null && (
-                      <div className="mt-2"><VenueMap lat={hotel.lat} lng={hotel.lng} label={hotel.name} height={140} /></div>
+                      <div className="mt-2">
+                        <HotelVenueMap
+                          hotelLat={hotel.lat} hotelLng={hotel.lng} hotelLabel={hotel.name}
+                          venueLat={show.venueLat} venueLng={show.venueLng} venueLabel={show.venue}
+                          height={160}
+                        />
+                      </div>
                     )}
+                    <RoomingListEditor show={show} setShow={setShow} hotelId={hotel.id} partyLabel={PARTY_LABELS[hotelIndex] ?? String(hotelIndex + 1)} />
                   </div>
                 ))}
               </div>
@@ -1249,7 +1263,6 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                 </button>
               )}
 
-              <RoomingListEditor show={show} setShow={setShow} hotels={show.hotels} />
             </div>
 
             {/* Flights */}

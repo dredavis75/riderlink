@@ -835,7 +835,7 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2"><Building2 size={13} /> Rooming List</h3>
-                        {show.roomingDays.length > 0 && (
+                        {show.hotels.length > 0 && (
                           <a href={`/api/pdf/rooming/${show.id}`} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 transition-colors">
                             <Download size={13} /> Download PDF
