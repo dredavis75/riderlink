@@ -74,6 +74,7 @@ export default function RiderLibrary() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editItems, setEditItems] = useState<LocalItem[]>([])
   const [uploadingItemImageId, setUploadingItemImageId] = useState<string | null>(null)
+  const [itemImageMsg, setItemImageMsg] = useState<{ id: string; ok: boolean } | null>(null)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [uploadingPdf, setUploadingPdf] = useState<string | null>(null)
@@ -131,6 +132,7 @@ export default function RiderLibrary() {
 
   async function handleUploadItemImage(itemId: string, file: File) {
     setUploadingItemImageId(itemId)
+    setItemImageMsg(null)
     try {
       const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
       const path = `item-overrides/${itemId}-${Date.now()}.${ext}`
@@ -142,8 +144,12 @@ export default function RiderLibrary() {
       await updateMasterItem(itemId, { imageUrl: urlData.publicUrl })
       setEditItems(prev => prev.map(i => i.id === itemId ? { ...i, imageUrl: urlData.publicUrl } : i))
       await load(workspaceId)
-    } catch { /* leave existing image in place on failure */ }
+      setItemImageMsg({ id: itemId, ok: true })
+    } catch {
+      setItemImageMsg({ id: itemId, ok: false })
+    }
     setUploadingItemImageId(null)
+    setTimeout(() => setItemImageMsg(prev => (prev?.id === itemId ? null : prev)), 2500)
   }
 
   async function loadCommunityPhotoList() {
@@ -533,6 +539,11 @@ export default function RiderLibrary() {
                                         ? <Loader2 size={14} className="animate-spin text-white" />
                                         : <ImagePlus size={14} className="text-white opacity-0 group-hover/img:opacity-100 transition-opacity" />}
                                     </div>
+                                    {itemImageMsg?.id === item.id && (
+                                      <div className={`absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow ${itemImageMsg.ok ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                                        {itemImageMsg.ok ? <Check size={11} className="text-white" /> : <X size={11} className="text-white" />}
+                                      </div>
+                                    )}
                                     <input type="file" accept="image/*" className="hidden"
                                       onChange={e => { if (e.target.files?.[0]) handleUploadItemImage(item.id, e.target.files[0]); e.target.value = '' }} />
                                   </label>

@@ -75,6 +75,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [editQuantity, setEditQuantity]     = useState('')
   const [editNotes, setEditNotes]           = useState('')
   const [uploadingItemImageId, setUploadingItemImageId] = useState<string | null>(null)
+  const [itemImageMsg, setItemImageMsg] = useState<{ id: string; ok: boolean } | null>(null)
   const [editingCategory, setEditingCategory] = useState<string | null>(null)
   const [addingItemTo, setAddingItemTo]     = useState<string | null>(null)
   const [newItemName, setNewItemName]       = useState('')
@@ -216,6 +217,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
 
   async function handleUploadItemImage(itemId: string, file: File) {
     setUploadingItemImageId(itemId)
+    setItemImageMsg(null)
     try {
       const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
       const path = `item-overrides/${itemId}-${Date.now()}.${ext}`
@@ -226,8 +228,12 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
       const { data: urlData } = supabase.storage.from('rider-photos').getPublicUrl(path)
       await updateItem(itemId, { image_url: urlData.publicUrl })
       setShow(prev => prev ? { ...prev, items: prev.items.map(i => i.id === itemId ? { ...i, imageUrl: urlData.publicUrl } : i) } : prev)
-    } catch { /* leave existing image in place on failure */ }
+      setItemImageMsg({ id: itemId, ok: true })
+    } catch {
+      setItemImageMsg({ id: itemId, ok: false })
+    }
     setUploadingItemImageId(null)
+    setTimeout(() => setItemImageMsg(prev => (prev?.id === itemId ? null : prev)), 2500)
   }
 
   async function saveCategory(oldCategory: string) {
@@ -871,6 +877,11 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                                   ? <Loader2 size={18} className="animate-spin text-white" />
                                   : <ImagePlus size={18} className="text-white opacity-0 group-hover/img:opacity-100 transition-opacity" />}
                               </div>
+                              {itemImageMsg?.id === item.id && (
+                                <div className={`absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow ${itemImageMsg.ok ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                                  {itemImageMsg.ok ? <CheckCircle2 size={13} className="text-white" /> : <X size={13} className="text-white" />}
+                                </div>
+                              )}
                               <input type="file" accept="image/*" className="hidden"
                                 onChange={e => { if (e.target.files?.[0]) handleUploadItemImage(item.id, e.target.files[0]); e.target.value = '' }} />
                             </label>
