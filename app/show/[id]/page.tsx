@@ -1249,9 +1249,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                 </button>
               )}
 
-              {show.hotels.length > 0 && (
-                <RoomingListEditor show={show} setShow={setShow} hotels={show.hotels} />
-              )}
+              <RoomingListEditor show={show} setShow={setShow} hotels={show.hotels} />
             </div>
 
             {/* Flights */}
