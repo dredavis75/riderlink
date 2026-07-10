@@ -151,7 +151,7 @@ function ShowCard({
       </button>
 
       {/* Clickable main area */}
-      <button onClick={onClick} className="w-full text-left p-5">
+      <button onClick={onClick} className="w-full text-left p-5 pr-11">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`w-2 h-2 rounded-full shrink-0 ${dot} ${show.status === 'active' ? 'animate-pulse' : ''}`} />
@@ -160,7 +160,7 @@ function ShowCard({
             {show.buyerApprovedAt && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Received</span>}
           </div>
           {unread > 0 && (
-            <span className="flex items-center gap-1 text-xs font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
+            <span className="flex items-center gap-1 text-xs font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200 shrink-0">
               <Bell size={10} /> {unread} new
             </span>
           )}

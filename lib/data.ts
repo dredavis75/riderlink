@@ -64,7 +64,9 @@ export interface Show {
   buyerCoversHotel: boolean
   buyerCoversFlights: boolean
   hotels: Hotel[]
-  roomingList: RoomingListEntry[]
+  roomingDays: RoomingDay[]
+  roomingGuests: RoomingGuest[]
+  roomingAssignments: RoomingAssignment[]
   flights: Flight[]
 }
 
@@ -78,14 +80,50 @@ export interface Hotel {
   sortOrder: number
 }
 
-export interface RoomingListEntry {
+export type RoomingBookingStatus = 'requested' | 'confirmed' | 'need_approval' | 'unconfirmed'
+
+export const ROOMING_BOOKING_STATUS_LABELS: Record<RoomingBookingStatus, string> = {
+  requested: 'Requested',
+  confirmed: 'Confirmed',
+  need_approval: 'Need Approval',
+  unconfirmed: 'Unconfirmed',
+}
+
+// One column of the rooming grid — a date of the run, with its hotel/status/notes.
+export interface RoomingDay {
   id: string
   showId: string
-  hotelId: string
-  roomType: string
-  guestName?: string
-  checkinDate?: string
-  checkoutDate?: string
+  date: string
+  hotelId?: string
+  bookingStatus: RoomingBookingStatus
+  note?: string
+  singleCount: number
+  doubleCount: number
+  suiteCount: number
+  sortOrder: number
+}
+
+export type RoomingParty = 'A' | 'B'
+
+// One row of the rooming grid — a person on the roster.
+export interface RoomingGuest {
+  id: string
+  showId: string
+  party: RoomingParty
+  firstName: string
+  lastName: string
+  sex?: string
+  confirmationNumber?: string
+  sortOrder: number
+}
+
+// One cell of the rooming grid — a guest's room assignment on a given date.
+export interface RoomingAssignment {
+  id: string
+  showId: string
+  guestId: string
+  date: string
+  roomLabel: string
   sortOrder: number
 }
 
@@ -147,7 +185,9 @@ export const MOCK_SHOWS: Show[] = [
     buyerCoversHotel: false,
     buyerCoversFlights: false,
     hotels: [],
-    roomingList: [],
+    roomingDays: [],
+    roomingGuests: [],
+    roomingAssignments: [],
     flights: [],
     artist: 'SKRILLA',
     venue: 'State Farm Arena',
@@ -194,7 +234,9 @@ export const MOCK_SHOWS: Show[] = [
     buyerCoversHotel: false,
     buyerCoversFlights: false,
     hotels: [],
-    roomingList: [],
+    roomingDays: [],
+    roomingGuests: [],
+    roomingAssignments: [],
     flights: [],
     artist: 'G Herbo',
     venue: 'United Center',
@@ -219,7 +261,9 @@ export const MOCK_SHOWS: Show[] = [
     buyerCoversHotel: false,
     buyerCoversFlights: false,
     hotels: [],
-    roomingList: [],
+    roomingDays: [],
+    roomingGuests: [],
+    roomingAssignments: [],
     flights: [],
     artist: 'Keyshia Cole',
     venue: 'Barclays Center',
@@ -250,7 +294,9 @@ export const MOCK_SHOWS: Show[] = [
     buyerCoversHotel: false,
     buyerCoversFlights: false,
     hotels: [],
-    roomingList: [],
+    roomingDays: [],
+    roomingGuests: [],
+    roomingAssignments: [],
     flights: [],
     artist: 'Flo Milli',
     venue: 'Kia Forum',

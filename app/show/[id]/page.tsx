@@ -10,13 +10,14 @@ import {
 import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, FLIGHT_CLASS_LABELS, type RiderItem, type ItemStatus, type Show, type FlightClass } from '@/lib/data'
 import {
   getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, updateShowVenue, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact,
-  addHotel, updateHotel, deleteHotel, addRoomingEntry, updateRoomingEntry, deleteRoomingEntry, addFlight, updateFlight, deleteFlight, updateShowTravelFlags,
+  addHotel, updateHotel, deleteHotel, addFlight, updateFlight, deleteFlight, updateShowTravelFlags,
   propagateItemImageToMaster,
 } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
 import ProductImage from '@/app/components/ProductImage'
 import VenueMap from '@/app/components/VenueMap'
+import RoomingListEditor from '@/app/components/RoomingListEditor'
 
 const ARTIST_COLORS: Record<string, string> = {
   'G Herbo':     'from-emerald-600 to-emerald-800',
@@ -127,20 +128,6 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [showHotelDropdown, setShowHotelDropdown] = useState(false)
   const hotelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hotelDropdownRef = useRef<HTMLDivElement>(null)
-
-  // Rooming list
-  const [addingRoom, setAddingRoom] = useState(false)
-  const [newRoomHotelId, setNewRoomHotelId] = useState('')
-  const [newRoomType, setNewRoomType] = useState('')
-  const [newRoomGuest, setNewRoomGuest] = useState('')
-  const [newRoomCheckin, setNewRoomCheckin] = useState('')
-  const [newRoomCheckout, setNewRoomCheckout] = useState('')
-  const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
-  const [editRoomHotelId, setEditRoomHotelId] = useState('')
-  const [editRoomType, setEditRoomType] = useState('')
-  const [editRoomGuest, setEditRoomGuest] = useState('')
-  const [editRoomCheckin, setEditRoomCheckin] = useState('')
-  const [editRoomCheckout, setEditRoomCheckout] = useState('')
 
   // Flights
   const [addingFlight, setAddingFlight] = useState(false)
@@ -494,38 +481,9 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
     setShow(prev => prev ? {
       ...prev,
       hotels: prev.hotels.filter(h => h.id !== id),
-      roomingList: prev.roomingList.filter(r => r.hotelId !== id),
+      roomingDays: prev.roomingDays.map(d => d.hotelId === id ? { ...d, hotelId: undefined } : d),
     } : prev)
     try { await deleteHotel(id) } catch {}
-  }
-
-  async function handleAddRoom() {
-    if (!show || !newRoomHotelId) return
-    try {
-      const room = await addRoomingEntry(show.id, {
-        hotelId: newRoomHotelId, roomType: newRoomType.trim(), guestName: newRoomGuest.trim() || undefined,
-        checkinDate: newRoomCheckin || undefined, checkoutDate: newRoomCheckout || undefined,
-      }, show.roomingList.length)
-      setShow(prev => prev ? { ...prev, roomingList: [...prev.roomingList, room] } : prev)
-      setAddingRoom(false)
-      setNewRoomHotelId(''); setNewRoomType(''); setNewRoomGuest(''); setNewRoomCheckin(''); setNewRoomCheckout('')
-    } catch { /* keep form open on failure */ }
-  }
-
-  async function handleSaveRoomEdit(id: string) {
-    setShow(prev => prev ? {
-      ...prev,
-      roomingList: prev.roomingList.map(r => r.id === id ? { ...r, hotelId: editRoomHotelId, roomType: editRoomType, guestName: editRoomGuest, checkinDate: editRoomCheckin, checkoutDate: editRoomCheckout } : r),
-    } : prev)
-    setEditingRoomId(null)
-    try {
-      await updateRoomingEntry(id, { hotelId: editRoomHotelId, roomType: editRoomType, guestName: editRoomGuest, checkinDate: editRoomCheckin, checkoutDate: editRoomCheckout })
-    } catch {}
-  }
-
-  async function handleDeleteRoom(id: string) {
-    setShow(prev => prev ? { ...prev, roomingList: prev.roomingList.filter(r => r.id !== id) } : prev)
-    try { await deleteRoomingEntry(id) } catch {}
   }
 
   async function lookupNewFlight() {
@@ -1292,90 +1250,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
               )}
 
               {show.hotels.length > 0 && (
-                <div className="mt-5 pt-4 border-t border-amber-100">
-                  <h4 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3">Rooming List</h4>
-                  <div className="space-y-2">
-                    {show.roomingList.length === 0 && !addingRoom && <p className="text-sm text-gray-400 mb-2">No rooms added yet.</p>}
-                    {show.roomingList.map(room => {
-                      const hotel = show.hotels.find(h => h.id === room.hotelId)
-                      return (
-                        <div key={room.id} className="border border-amber-200 rounded-xl p-3">
-                          {editingRoomId === room.id ? (
-                            <div className="space-y-1.5">
-                              <select value={editRoomHotelId} onChange={e => setEditRoomHotelId(e.target.value)}
-                                className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                                {show.hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                              </select>
-                              <div className="flex gap-1.5">
-                                <input value={editRoomType} onChange={e => setEditRoomType(e.target.value)} placeholder="Room type"
-                                  className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                                <input value={editRoomGuest} onChange={e => setEditRoomGuest(e.target.value)} placeholder="Guest (optional)"
-                                  className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                              </div>
-                              <div className="flex gap-1.5">
-                                <input type="date" value={editRoomCheckin} onChange={e => setEditRoomCheckin(e.target.value)}
-                                  className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                                <input type="date" value={editRoomCheckout} onChange={e => setEditRoomCheckout(e.target.value)}
-                                  className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                              </div>
-                              <div className="flex gap-2">
-                                <button onClick={() => handleSaveRoomEdit(room.id)} className="text-sm font-bold text-emerald-700">Save</button>
-                                <button onClick={() => setEditingRoomId(null)} className="text-sm text-gray-500">Cancel</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <p className="text-sm font-bold text-gray-900">{hotel?.name ?? 'Unknown hotel'}{room.roomType && ` · ${room.roomType}`}</p>
-                                {room.guestName && <p className="text-xs text-gray-600 mt-0.5">{room.guestName}</p>}
-                                <p className="text-xs text-gray-500 mt-0.5">{room.checkinDate ?? '—'} → {room.checkoutDate ?? '—'}</p>
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button onClick={() => { setEditingRoomId(room.id); setEditRoomHotelId(room.hotelId); setEditRoomType(room.roomType); setEditRoomGuest(room.guestName ?? ''); setEditRoomCheckin(room.checkinDate ?? ''); setEditRoomCheckout(room.checkoutDate ?? '') }}
-                                  className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 transition-colors">
-                                  <Edit3 size={12} />
-                                </button>
-                                <button onClick={() => handleDeleteRoom(room.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {addingRoom ? (
-                    <div className="space-y-1.5 border border-amber-200 rounded-xl p-3 mt-2">
-                      <select value={newRoomHotelId} onChange={e => setNewRoomHotelId(e.target.value)} autoFocus
-                        className="w-full text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                        <option value="">Select hotel…</option>
-                        {show.hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                      </select>
-                      <div className="flex gap-1.5">
-                        <input value={newRoomType} onChange={e => setNewRoomType(e.target.value)} placeholder="Room type"
-                          className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                        <input value={newRoomGuest} onChange={e => setNewRoomGuest(e.target.value)} placeholder="Guest (optional)"
-                          className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                      </div>
-                      <div className="flex gap-1.5">
-                        <input type="date" value={newRoomCheckin} onChange={e => setNewRoomCheckin(e.target.value)}
-                          className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                        <input type="date" value={newRoomCheckout} onChange={e => setNewRoomCheckout(e.target.value)}
-                          className="flex-1 text-sm bg-white border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={handleAddRoom} disabled={!newRoomHotelId} className="text-sm font-bold text-emerald-700 disabled:opacity-40">Add Room</button>
-                        <button onClick={() => { setAddingRoom(false); setNewRoomHotelId(''); setNewRoomType(''); setNewRoomGuest(''); setNewRoomCheckin(''); setNewRoomCheckout('') }} className="text-sm text-gray-500">Cancel</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button onClick={() => setAddingRoom(true)} className="flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 transition-colors mt-2">
-                      <Plus size={13} /> Add Room
-                    </button>
-                  )}
-                </div>
+                <RoomingListEditor show={show} setShow={setShow} hotels={show.hotels} />
               )}
             </div>
 

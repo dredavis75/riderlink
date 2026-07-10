@@ -1,5 +1,5 @@
 import { supabase, isConfigured } from './supabase'
-import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem, RiderTemplate, RiderPdfSection, DayOfShowContacts, BuyerAttachment, Hotel, RoomingListEntry, Flight, FlightClass } from './data'
+import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem, RiderTemplate, RiderPdfSection, DayOfShowContacts, BuyerAttachment, Hotel, RoomingDay, RoomingBookingStatus, RoomingGuest, RoomingParty, RoomingAssignment, Flight, FlightClass } from './data'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,17 +60,40 @@ function mapShow(row: any): Show {
         lng: h.lng ?? undefined,
         sortOrder: h.sort_order,
       })),
-    roomingList: (row.rooming_list ?? [])
+    roomingDays: (row.rooming_days ?? [])
+      .sort((a: any, b: any) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.sort_order - b.sort_order))
+      .map((d: any): RoomingDay => ({
+        id: d.id,
+        showId: d.show_id,
+        date: d.date,
+        hotelId: d.hotel_id ?? undefined,
+        bookingStatus: (d.booking_status ?? 'requested') as RoomingBookingStatus,
+        note: d.note || undefined,
+        singleCount: d.single_count ?? 0,
+        doubleCount: d.double_count ?? 0,
+        suiteCount: d.suite_count ?? 0,
+        sortOrder: d.sort_order,
+      })),
+    roomingGuests: (row.rooming_guests ?? [])
       .sort((a: any, b: any) => a.sort_order - b.sort_order)
-      .map((r: any): RoomingListEntry => ({
-        id: r.id,
-        showId: r.show_id,
-        hotelId: r.hotel_id,
-        roomType: r.room_type ?? '',
-        guestName: r.guest_name || undefined,
-        checkinDate: r.checkin_date ?? undefined,
-        checkoutDate: r.checkout_date ?? undefined,
-        sortOrder: r.sort_order,
+      .map((g: any): RoomingGuest => ({
+        id: g.id,
+        showId: g.show_id,
+        party: (g.party ?? 'B') as RoomingParty,
+        firstName: g.first_name ?? '',
+        lastName: g.last_name ?? '',
+        sex: g.sex || undefined,
+        confirmationNumber: g.confirmation_number || undefined,
+        sortOrder: g.sort_order,
+      })),
+    roomingAssignments: (row.rooming_assignments ?? [])
+      .map((a: any): RoomingAssignment => ({
+        id: a.id,
+        showId: a.show_id,
+        guestId: a.guest_id,
+        date: a.date,
+        roomLabel: a.room_label ?? '',
+        sortOrder: a.sort_order,
       })),
     flights: (row.flights ?? [])
       .sort((a: any, b: any) => a.sort_order - b.sort_order)
@@ -95,7 +118,7 @@ export async function getShows(workspaceId = 'default'): Promise<Show[]> {
   if (!isConfigured) throw new Error('Supabase not configured')
   const { data: shows, error } = await supabase
     .from('shows')
-    .select('*, rider_items(*), messages(*), hotels(*), rooming_list(*), flights(*)')
+    .select('*, rider_items(*), messages(*), hotels(*), rooming_days(*), rooming_guests(*), rooming_assignments(*), flights(*)')
     .eq('workspace_id', workspaceId)
     .order('date', { ascending: true })
 
@@ -108,7 +131,7 @@ export async function getShow(id: string): Promise<Show | null> {
   if (!isConfigured) throw new Error('Supabase not configured')
   const { data, error } = await supabase
     .from('shows')
-    .select('*, rider_items(*), messages(*), hotels(*), rooming_list(*), flights(*)')
+    .select('*, rider_items(*), messages(*), hotels(*), rooming_days(*), rooming_guests(*), rooming_assignments(*), flights(*)')
     .eq('id', id)
     .single()
 
@@ -116,7 +139,7 @@ export async function getShow(id: string): Promise<Show | null> {
   return mapShow(data)
 }
 
-export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages' | 'buyerCoversHotel' | 'buyerCoversFlights' | 'hotels' | 'roomingList' | 'flights'> & { items: Omit<RiderItem, 'id'>[] }, workspaceId = 'default'): Promise<string> {
+export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages' | 'buyerCoversHotel' | 'buyerCoversFlights' | 'hotels' | 'roomingDays' | 'roomingGuests' | 'roomingAssignments' | 'flights'> & { items: Omit<RiderItem, 'id'>[] }, workspaceId = 'default'): Promise<string> {
   let itemsToInsert = show.items
   let masterRiderId: string | null = null
   let masterPdfUrl: string | null = null
@@ -652,57 +675,154 @@ export async function deleteHotel(id: string): Promise<void> {
   if (error) throw error
 }
 
-function mapRoomingEntry(row: any): RoomingListEntry {
+function mapRoomingDay(row: any): RoomingDay {
   return {
     id: row.id,
     showId: row.show_id,
-    hotelId: row.hotel_id,
-    roomType: row.room_type ?? '',
-    guestName: row.guest_name || undefined,
-    checkinDate: row.checkin_date ?? undefined,
-    checkoutDate: row.checkout_date ?? undefined,
+    date: row.date,
+    hotelId: row.hotel_id ?? undefined,
+    bookingStatus: (row.booking_status ?? 'requested') as RoomingBookingStatus,
+    note: row.note || undefined,
+    singleCount: row.single_count ?? 0,
+    doubleCount: row.double_count ?? 0,
+    suiteCount: row.suite_count ?? 0,
     sortOrder: row.sort_order,
   }
 }
 
-export async function addRoomingEntry(
+export async function addRoomingDay(
   showId: string,
-  fields: { hotelId: string; roomType: string; guestName?: string; checkinDate?: string; checkoutDate?: string },
+  fields: { date: string; hotelId?: string; bookingStatus?: RoomingBookingStatus; note?: string; singleCount?: number; doubleCount?: number; suiteCount?: number },
   sortOrder: number
-): Promise<RoomingListEntry> {
+): Promise<RoomingDay> {
   const { data, error } = await supabase
-    .from('rooming_list')
+    .from('rooming_days')
     .insert({
       show_id: showId,
-      hotel_id: fields.hotelId,
-      room_type: fields.roomType,
-      guest_name: fields.guestName ?? '',
-      checkin_date: fields.checkinDate || null,
-      checkout_date: fields.checkoutDate || null,
+      date: fields.date,
+      hotel_id: fields.hotelId || null,
+      booking_status: fields.bookingStatus ?? 'requested',
+      note: fields.note ?? '',
+      single_count: fields.singleCount ?? 0,
+      double_count: fields.doubleCount ?? 0,
+      suite_count: fields.suiteCount ?? 0,
       sort_order: sortOrder,
     })
     .select()
     .single()
   if (error || !data) throw error
-  return mapRoomingEntry(data)
+  return mapRoomingDay(data)
 }
 
-export async function updateRoomingEntry(
+export async function updateRoomingDay(
   id: string,
-  fields: Partial<{ hotelId: string; roomType: string; guestName: string; checkinDate: string; checkoutDate: string }>
+  fields: Partial<{ date: string; hotelId: string; bookingStatus: RoomingBookingStatus; note: string; singleCount: number; doubleCount: number; suiteCount: number }>
 ): Promise<void> {
   const dbFields: Record<string, unknown> = {}
-  if (fields.hotelId !== undefined) dbFields.hotel_id = fields.hotelId
-  if (fields.roomType !== undefined) dbFields.room_type = fields.roomType
-  if (fields.guestName !== undefined) dbFields.guest_name = fields.guestName
-  if (fields.checkinDate !== undefined) dbFields.checkin_date = fields.checkinDate || null
-  if (fields.checkoutDate !== undefined) dbFields.checkout_date = fields.checkoutDate || null
-  const { error } = await supabase.from('rooming_list').update(dbFields).eq('id', id)
+  if (fields.date !== undefined) dbFields.date = fields.date
+  if (fields.hotelId !== undefined) dbFields.hotel_id = fields.hotelId || null
+  if (fields.bookingStatus !== undefined) dbFields.booking_status = fields.bookingStatus
+  if (fields.note !== undefined) dbFields.note = fields.note
+  if (fields.singleCount !== undefined) dbFields.single_count = fields.singleCount
+  if (fields.doubleCount !== undefined) dbFields.double_count = fields.doubleCount
+  if (fields.suiteCount !== undefined) dbFields.suite_count = fields.suiteCount
+  const { error } = await supabase.from('rooming_days').update(dbFields).eq('id', id)
   if (error) throw error
 }
 
-export async function deleteRoomingEntry(id: string): Promise<void> {
-  const { error } = await supabase.from('rooming_list').delete().eq('id', id)
+export async function deleteRoomingDay(id: string): Promise<void> {
+  const { error } = await supabase.from('rooming_days').delete().eq('id', id)
+  if (error) throw error
+}
+
+function mapRoomingGuest(row: any): RoomingGuest {
+  return {
+    id: row.id,
+    showId: row.show_id,
+    party: (row.party ?? 'B') as RoomingParty,
+    firstName: row.first_name ?? '',
+    lastName: row.last_name ?? '',
+    sex: row.sex || undefined,
+    confirmationNumber: row.confirmation_number || undefined,
+    sortOrder: row.sort_order,
+  }
+}
+
+export async function addRoomingGuest(
+  showId: string,
+  fields: { party: RoomingParty; firstName: string; lastName: string; sex?: string; confirmationNumber?: string },
+  sortOrder: number
+): Promise<RoomingGuest> {
+  const { data, error } = await supabase
+    .from('rooming_guests')
+    .insert({
+      show_id: showId,
+      party: fields.party,
+      first_name: fields.firstName,
+      last_name: fields.lastName,
+      sex: fields.sex || null,
+      confirmation_number: fields.confirmationNumber || null,
+      sort_order: sortOrder,
+    })
+    .select()
+    .single()
+  if (error || !data) throw error
+  return mapRoomingGuest(data)
+}
+
+export async function updateRoomingGuest(
+  id: string,
+  fields: Partial<{ party: RoomingParty; firstName: string; lastName: string; sex: string; confirmationNumber: string }>
+): Promise<void> {
+  const dbFields: Record<string, unknown> = {}
+  if (fields.party !== undefined) dbFields.party = fields.party
+  if (fields.firstName !== undefined) dbFields.first_name = fields.firstName
+  if (fields.lastName !== undefined) dbFields.last_name = fields.lastName
+  if (fields.sex !== undefined) dbFields.sex = fields.sex || null
+  if (fields.confirmationNumber !== undefined) dbFields.confirmation_number = fields.confirmationNumber || null
+  const { error } = await supabase.from('rooming_guests').update(dbFields).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteRoomingGuest(id: string): Promise<void> {
+  const { error } = await supabase.from('rooming_guests').delete().eq('id', id)
+  if (error) throw error
+}
+
+function mapRoomingAssignment(row: any): RoomingAssignment {
+  return {
+    id: row.id,
+    showId: row.show_id,
+    guestId: row.guest_id,
+    date: row.date,
+    roomLabel: row.room_label ?? '',
+    sortOrder: row.sort_order,
+  }
+}
+
+// Sets the room label for a guest on a given date — inserts the assignment if it
+// doesn't exist yet, or updates it in place (one cell of the rooming grid).
+export async function setRoomingAssignment(
+  showId: string,
+  guestId: string,
+  date: string,
+  roomLabel: string,
+  sortOrder = 0
+): Promise<RoomingAssignment> {
+  const { data, error } = await supabase
+    .from('rooming_assignments')
+    .upsert(
+      { show_id: showId, guest_id: guestId, date, room_label: roomLabel, sort_order: sortOrder },
+      { onConflict: 'guest_id,date' }
+    )
+    .select()
+    .single()
+  if (error || !data) throw error
+  return mapRoomingAssignment(data)
+}
+
+export async function deleteRoomingAssignment(id: string): Promise<void> {
+  const { error } = await supabase.from('rooming_assignments').delete().eq('id', id)
   if (error) throw error
 }
 

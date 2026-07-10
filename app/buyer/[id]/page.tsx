@@ -9,6 +9,7 @@ import { supabase, isConfigured } from '@/lib/supabase'
 import type { NotifyPayload } from '@/app/api/notify/route'
 import ProductImage from '@/app/components/ProductImage'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
+import RoomingListGrid from '@/app/components/RoomingListGrid'
 
 const ARTIST_COLORS: Record<string, string> = {
   'G Herbo':     'from-emerald-600 to-emerald-800',
@@ -832,24 +833,16 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
                 <div className="p-5 space-y-5">
                   {show.buyerCoversHotel && (
                     <div>
-                      <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2"><Building2 size={13} /> Rooming List</h3>
-                      {show.roomingList.length === 0 ? (
-                        <p className="text-sm text-gray-400">Rooming list not yet available.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {show.roomingList.map(room => {
-                            const hotel = show.hotels.find(h => h.id === room.hotelId)
-                            return (
-                              <div key={room.id} className="border border-amber-200 rounded-xl p-3 bg-amber-50">
-                                <p className="text-sm font-bold text-gray-900">{hotel?.name ?? 'Hotel'}{room.roomType && ` · ${room.roomType}`}</p>
-                                {room.guestName && <p className="text-xs text-gray-600 mt-0.5">{room.guestName}</p>}
-                                <p className="text-xs text-gray-500 mt-0.5">{room.checkinDate ?? '—'} → {room.checkoutDate ?? '—'}</p>
-                                {hotel?.address && <p className="text-xs text-gray-500 mt-0.5">{hotel.address}</p>}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2"><Building2 size={13} /> Rooming List</h3>
+                        {show.roomingDays.length > 0 && (
+                          <a href={`/api/pdf/rooming/${show.id}`} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 transition-colors">
+                            <Download size={13} /> Download PDF
+                          </a>
+                        )}
+                      </div>
+                      <RoomingListGrid show={show} />
                     </div>
                   )}
                   {show.buyerCoversFlights && (
