@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, FLIGHT_CLASS_LABELS, type RiderItem, type ItemStatus, type Show, type FlightClass, type Hotel } from '@/lib/data'
 import {
-  getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, updateShowStatus, updateShowVenue, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact,
+  getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, markBuyerInvited, updateShowStatus, updateShowVenue, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact,
   addHotel, updateHotel, deleteHotel, deleteRoomingGuest, addFlight, updateFlight, deleteFlight, updateShowTravelFlags,
   propagateItemImageToMaster,
 } from '@/lib/db'
@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
 import ProductImage from '@/app/components/ProductImage'
 import VenueMap from '@/app/components/VenueMap'
+import BuyerContactsPanel from '@/app/components/BuyerContactsPanel'
 import HotelVenueMap from '@/app/components/HotelVenueMap'
 import RoomingListEditor from '@/app/components/RoomingListEditor'
 
@@ -294,6 +295,9 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Send failed')
+      await markBuyerInvited(show.id)
+      const now = new Date().toISOString()
+      setShow(prev => prev ? { ...prev, buyerInvitedAt: now } : prev)
       if (data.smsError) {
         setInviteResult(`✓ Email sent · SMS failed: ${data.smsError}`)
       } else if (buyerPhone.trim()) {
@@ -816,7 +820,19 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
               className="w-full bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold text-sm px-4 py-2.5 rounded-xl disabled:opacity-40 transition-colors flex items-center justify-center gap-2">
               {inviting ? <><Loader2 size={13} className="animate-spin" /> Sending…</> : <><Send size={13} /> Send Official Rider</>}
             </button>
-            {inviteResult && <p className={`text-xs mt-2 font-semibold ${inviteResult.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{inviteResult}</p>}
+            {inviteResult ? (
+              <p className={`text-xs mt-2 font-semibold ${inviteResult.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{inviteResult}</p>
+            ) : (
+              <p className={`text-xs mt-2 font-semibold ${show.buyerOpenedAt ? 'text-emerald-600' : show.buyerInvitedAt ? 'text-amber-600' : 'text-gray-400'}`}>
+                {show.buyerOpenedAt
+                  ? `Opened ${new Date(show.buyerOpenedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  : show.buyerInvitedAt
+                    ? `Sent ${new Date(show.buyerInvitedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                    : 'Not sent yet'}
+              </p>
+            )}
+
+            <BuyerContactsPanel show={show} setShow={setShow} artistName={show.artist} venue={show.venue} city={show.city} date={show.date} />
           </div>
         )}
 

@@ -12,14 +12,14 @@ const SENDER_TITLE  = process.env.EMAIL_SENDER_TITLE ?? `Tour Director · ${COMP
 const SENDER_EMAIL  = process.env.EMAIL_SENDER_ADDRESS ?? 'dre.davis@bluealleytouring.com'
 
 export async function POST(req: NextRequest) {
-  const { buyerName, buyerEmail, buyerPhone, artistName, venue, city, date, showId } = await req.json()
+  const { buyerName, buyerEmail, buyerPhone, artistName, venue, city, date, showId, contactId } = await req.json()
 
   if ((!buyerEmail && !buyerPhone) || !showId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? 'https://riderlink.vercel.app'
-  const buyerUrl = `${base}/buyer/${showId}`
+  const buyerUrl = contactId ? `${base}/buyer/${showId}?c=${contactId}` : `${base}/buyer/${showId}`
   const showDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   })

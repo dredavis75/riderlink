@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, use, useCallback } from 'react'
+import { useState, useEffect, useRef, use, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, Download, Zap, Users, X, Phone, Mail, FileText, Upload, Shield, Music, DollarSign, Wrench, AlertTriangle, ArrowLeft, Building2, Plane } from 'lucide-react'
 import { MOCK_SHOWS, OFFICIAL_RIDER_PDFS, FLIGHT_CLASS_LABELS, type RiderItem, type ItemStatus, type Show, type DayOfShowContacts } from '@/lib/data'
-import { getShow, updateItem as dbUpdateItem, sendMessage as dbSendMessage, subscribeToShow, approveRider, saveShowDayOfShow, getAllManagementContacts, type ManagementContact } from '@/lib/db'
+import { getShow, updateItem as dbUpdateItem, sendMessage as dbSendMessage, subscribeToShow, approveRider, saveShowDayOfShow, getAllManagementContacts, recordBuyerOpen, type ManagementContact } from '@/lib/db'
 import { supabase, isConfigured } from '@/lib/supabase'
 import type { NotifyPayload } from '@/app/api/notify/route'
 import ProductImage from '@/app/components/ProductImage'
@@ -404,6 +404,8 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
   const { id } = use(params)
   const searchParams = useSearchParams()
   const isAdmin = searchParams.get('admin') === '1'
+  const contactId = searchParams.get('c') ?? undefined
+  const trackedOpen = useRef(false)
 
   const [show, setShow] = useState<Show | null>(null)
   const [items, setItems] = useState<RiderItem[]>([])
@@ -432,6 +434,10 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
           }
           const contacts = await getAllManagementContacts()
           setMgmtContacts(contacts[data.artist] ?? [])
+          if (!isAdmin && !trackedOpen.current) {
+            trackedOpen.current = true
+            recordBuyerOpen(id, contactId).catch(() => {})
+          }
         }
       } else {
         const mock = MOCK_SHOWS.find(s => s.id === id) ?? null

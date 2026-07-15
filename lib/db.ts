@@ -1,5 +1,5 @@
 import { supabase, isConfigured } from './supabase'
-import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem, RiderTemplate, RiderPdfSection, DayOfShowContacts, BuyerAttachment, Hotel, RoomingGuest, Flight, FlightClass } from './data'
+import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem, RiderTemplate, RiderPdfSection, DayOfShowContacts, BuyerAttachment, Hotel, RoomingGuest, BuyerContact, Flight, FlightClass } from './data'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -18,6 +18,10 @@ function mapShow(row: any): Show {
     status: row.status,
     buyerApprovedAt: row.buyer_approved_at ?? undefined,
     buyerApprovedName: row.buyer_approved_name ?? undefined,
+    buyerInvitedAt: row.buyer_invited_at ?? undefined,
+    buyerOpenedAt: row.buyer_opened_at ?? undefined,
+    buyerLastOpenedAt: row.buyer_last_opened_at ?? undefined,
+    buyerOpenCount: row.buyer_open_count ?? 0,
     riderVersion: row.rider_version ?? undefined,
     riderPdfUrl: row.rider_pdf_url ?? undefined,
     masterRiderId: row.master_rider_id ?? undefined,
@@ -88,6 +92,21 @@ function mapShow(row: any): Show {
         classOfService: (f.class_of_service ?? 'coach') as FlightClass,
         sortOrder: f.sort_order,
       })),
+    buyerContacts: (row.buyer_contacts ?? [])
+      .sort((a: any, b: any) => a.sort_order - b.sort_order)
+      .map((c: any): BuyerContact => ({
+        id: c.id,
+        showId: c.show_id,
+        name: c.name ?? '',
+        role: c.role ?? '',
+        email: c.email ?? '',
+        phone: c.phone || undefined,
+        sortOrder: c.sort_order,
+        invitedAt: c.invited_at ?? undefined,
+        openedAt: c.opened_at ?? undefined,
+        lastOpenedAt: c.last_opened_at ?? undefined,
+        openCount: c.open_count ?? 0,
+      })),
   }
 }
 
@@ -97,7 +116,7 @@ export async function getShows(workspaceId = 'default'): Promise<Show[]> {
   if (!isConfigured) throw new Error('Supabase not configured')
   const { data: shows, error } = await supabase
     .from('shows')
-    .select('*, rider_items(*), messages(*), hotels(*), rooming_guests(*), flights(*)')
+    .select('*, rider_items(*), messages(*), hotels(*), rooming_guests(*), flights(*), buyer_contacts(*)')
     .eq('workspace_id', workspaceId)
     .order('date', { ascending: true })
 
@@ -110,7 +129,7 @@ export async function getShow(id: string): Promise<Show | null> {
   if (!isConfigured) throw new Error('Supabase not configured')
   const { data, error } = await supabase
     .from('shows')
-    .select('*, rider_items(*), messages(*), hotels(*), rooming_guests(*), flights(*)')
+    .select('*, rider_items(*), messages(*), hotels(*), rooming_guests(*), flights(*), buyer_contacts(*)')
     .eq('id', id)
     .single()
 
@@ -118,7 +137,7 @@ export async function getShow(id: string): Promise<Show | null> {
   return mapShow(data)
 }
 
-export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages' | 'buyerCoversHotel' | 'buyerCoversFlights' | 'hotels' | 'roomingGuests' | 'flights'> & { items: Omit<RiderItem, 'id'>[] }, workspaceId = 'default'): Promise<string> {
+export async function createShow(show: Omit<Show, 'id' | 'items' | 'messages' | 'buyerCoversHotel' | 'buyerCoversFlights' | 'hotels' | 'roomingGuests' | 'flights' | 'buyerContacts'> & { items: Omit<RiderItem, 'id'>[] }, workspaceId = 'default'): Promise<string> {
   let itemsToInsert = show.items
   let masterRiderId: string | null = null
   let masterPdfUrl: string | null = null
@@ -247,6 +266,35 @@ export async function resetShowRiderFromMaster(showId: string, artist: string, w
 export async function updateBuyer(showId: string, buyerName: string, buyerEmail: string) {
   const { error } = await supabase.from('shows').update({ buyer_name: buyerName, buyer_email: buyerEmail }).eq('id', showId)
   if (error) throw error
+}
+
+export async function markBuyerInvited(showId: string): Promise<void> {
+  const { error } = await supabase.from('shows').update({ buyer_invited_at: new Date().toISOString() }).eq('id', showId)
+  if (error) throw error
+}
+
+// Records a link open — sets opened_at only the first time, always bumps
+// last_opened_at/open_count. Targets the primary buyer (on `shows`) when no
+// contactId is given, otherwise a specific `buyer_contacts` row.
+export async function recordBuyerOpen(showId: string, contactId?: string): Promise<void> {
+  const now = new Date().toISOString()
+  if (contactId) {
+    const { data } = await supabase.from('buyer_contacts').select('opened_at, open_count').eq('id', contactId).single()
+    if (!data) return
+    await supabase.from('buyer_contacts').update({
+      opened_at: data.opened_at ?? now,
+      last_opened_at: now,
+      open_count: (data.open_count ?? 0) + 1,
+    }).eq('id', contactId)
+  } else {
+    const { data } = await supabase.from('shows').select('buyer_opened_at, buyer_open_count').eq('id', showId).single()
+    if (!data) return
+    await supabase.from('shows').update({
+      buyer_opened_at: data.buyer_opened_at ?? now,
+      buyer_last_opened_at: now,
+      buyer_open_count: (data.buyer_open_count ?? 0) + 1,
+    }).eq('id', showId)
+  }
 }
 
 export async function updateShowVenue(
@@ -773,6 +821,68 @@ export async function updateFlight(
 
 export async function deleteFlight(id: string): Promise<void> {
   const { error } = await supabase.from('flights').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ── Buyer Contacts ─────────────────────────────────────────────────────────────
+
+function mapBuyerContact(row: any): BuyerContact {
+  return {
+    id: row.id,
+    showId: row.show_id,
+    name: row.name ?? '',
+    role: row.role ?? '',
+    email: row.email ?? '',
+    phone: row.phone || undefined,
+    sortOrder: row.sort_order,
+    invitedAt: row.invited_at ?? undefined,
+    openedAt: row.opened_at ?? undefined,
+    lastOpenedAt: row.last_opened_at ?? undefined,
+    openCount: row.open_count ?? 0,
+  }
+}
+
+export async function addBuyerContact(
+  showId: string,
+  fields: { name: string; role: string; email: string; phone?: string },
+  sortOrder: number
+): Promise<BuyerContact> {
+  const { data, error } = await supabase
+    .from('buyer_contacts')
+    .insert({
+      show_id: showId,
+      name: fields.name,
+      role: fields.role,
+      email: fields.email,
+      phone: fields.phone || null,
+      sort_order: sortOrder,
+    })
+    .select()
+    .single()
+  if (error || !data) throw error
+  return mapBuyerContact(data)
+}
+
+export async function updateBuyerContact(
+  id: string,
+  fields: Partial<{ name: string; role: string; email: string; phone: string }>
+): Promise<void> {
+  const dbFields: Record<string, unknown> = {}
+  if (fields.name !== undefined) dbFields.name = fields.name
+  if (fields.role !== undefined) dbFields.role = fields.role
+  if (fields.email !== undefined) dbFields.email = fields.email
+  if (fields.phone !== undefined) dbFields.phone = fields.phone || null
+  const { error } = await supabase.from('buyer_contacts').update(dbFields).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteBuyerContact(id: string): Promise<void> {
+  const { error } = await supabase.from('buyer_contacts').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function markContactInvited(contactId: string): Promise<void> {
+  const { error } = await supabase.from('buyer_contacts').update({ invited_at: new Date().toISOString() }).eq('id', contactId)
   if (error) throw error
 }
 

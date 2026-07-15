@@ -53,6 +53,10 @@ export interface Show {
   messages: Message[]
   buyerApprovedAt?: string
   buyerApprovedName?: string
+  buyerInvitedAt?: string
+  buyerOpenedAt?: string
+  buyerLastOpenedAt?: string
+  buyerOpenCount?: number
   riderVersion?: string
   riderPdfUrl?: string
   masterRiderId?: string
@@ -65,7 +69,25 @@ export interface Show {
   buyerCoversFlights: boolean
   hotels: Hotel[]
   roomingGuests: RoomingGuest[]
+  buyerContacts: BuyerContact[]
   flights: Flight[]
+}
+
+// An additional buyer-side recipient beyond the primary buyer (e.g.
+// production manager, hospitality manager) — each gets their own
+// tracked link so opens can be attributed to a specific person.
+export interface BuyerContact {
+  id: string
+  showId: string
+  name: string
+  role: string
+  email: string
+  phone?: string
+  sortOrder: number
+  invitedAt?: string
+  openedAt?: string
+  lastOpenedAt?: string
+  openCount: number
 }
 
 export interface Hotel {
@@ -153,6 +175,7 @@ export const MOCK_SHOWS: Show[] = [
     buyerCoversFlights: false,
     hotels: [],
     roomingGuests: [],
+    buyerContacts: [],
     flights: [],
     artist: 'SKRILLA',
     venue: 'State Farm Arena',
@@ -200,6 +223,7 @@ export const MOCK_SHOWS: Show[] = [
     buyerCoversFlights: false,
     hotels: [],
     roomingGuests: [],
+    buyerContacts: [],
     flights: [],
     artist: 'G Herbo',
     venue: 'United Center',
@@ -225,6 +249,7 @@ export const MOCK_SHOWS: Show[] = [
     buyerCoversFlights: false,
     hotels: [],
     roomingGuests: [],
+    buyerContacts: [],
     flights: [],
     artist: 'Keyshia Cole',
     venue: 'Barclays Center',
@@ -256,6 +281,7 @@ export const MOCK_SHOWS: Show[] = [
     buyerCoversFlights: false,
     hotels: [],
     roomingGuests: [],
+    buyerContacts: [],
     flights: [],
     artist: 'Flo Milli',
     venue: 'Kia Forum',
