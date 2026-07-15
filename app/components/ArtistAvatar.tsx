@@ -26,7 +26,10 @@ function resolve(artist: string, cb: (url: string | null) => void) {
   listeners[artist].push(cb)
   if (cached === 'loading') return
   imgCache[artist] = 'loading'
-  fetch(`/api/artist-image?name=${encodeURIComponent(artist)}`)
+  // v=2 busts browsers that cached a wrong picture under the old 7-day
+  // Cache-Control before the Tink/SKRILLA artist-ID pinning fix shipped —
+  // bump this whenever a previously-served artist-image response was wrong.
+  fetch(`/api/artist-image?name=${encodeURIComponent(artist)}&v=2`)
     .then((r) => r.json())
     .then(({ url }: { url: string | null }) => {
       imgCache[artist] = url
