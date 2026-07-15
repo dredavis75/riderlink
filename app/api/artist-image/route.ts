@@ -7,11 +7,33 @@ const WIKIPEDIA: Record<string, string> = {
   'Flo Milli':   'Flo_Milli',
   'K. Michelle': 'K._Michelle',
   'RL':          'RL_(singer)',
+  'Tink':        'Tink_(musician)',
+}
+
+// Deezer search returns multiple artists sharing a common name (e.g. several
+// "Tink"s, several "Skrilla"s), several with blank placeholder pictures, and
+// name-match order isn't ranked by relevance. Pin the confirmed correct
+// Deezer artist ID for names where search has landed on the wrong one.
+const DEEZER_ARTIST_ID: Record<string, number> = {
+  'Tink':    4904080,
+  'SKRILLA': 1073070,
 }
 
 const cache = new Map<string, string | null>()
 
+async function fromDeezerId(id: number): Promise<string | null> {
+  const res = await fetch(`https://api.deezer.com/artist/${id}`, {
+    next: { revalidate: 86400 * 7 },
+  })
+  if (!res.ok) return null
+  const data = await res.json()
+  return data?.picture_big ?? data?.picture_medium ?? null
+}
+
 async function fromDeezer(name: string): Promise<string | null> {
+  const pinnedId = DEEZER_ARTIST_ID[name]
+  if (pinnedId) return fromDeezerId(pinnedId)
+
   const res = await fetch(
     `https://api.deezer.com/search/artist?q=${encodeURIComponent(name)}&limit=5`,
     { next: { revalidate: 86400 * 7 } }
