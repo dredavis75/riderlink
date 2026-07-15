@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, use, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle2, XCircle, RefreshCw, Clock, Send, ChevronDown, ChevronUp, Loader2, Download, Zap, Users, X, Phone, Mail, FileText, Upload, Shield, Music, DollarSign, Wrench, AlertTriangle, ArrowLeft, Building2, Plane } from 'lucide-react'
 import { MOCK_SHOWS, OFFICIAL_RIDER_PDFS, FLIGHT_CLASS_LABELS, type RiderItem, type ItemStatus, type Show, type DayOfShowContacts } from '@/lib/data'
-import { getShow, updateItem as dbUpdateItem, sendMessage as dbSendMessage, subscribeToShow, approveRider, saveShowDayOfShow, getAllManagementContacts, recordBuyerOpen, type ManagementContact } from '@/lib/db'
+import { getShow, updateItem as dbUpdateItem, sendMessage as dbSendMessage, subscribeToShow, approveRider, saveShowDayOfShow, upsertDayOfShowContact, getAllManagementContacts, recordBuyerOpen, type ManagementContact } from '@/lib/db'
 import { supabase, isConfigured } from '@/lib/supabase'
 import type { NotifyPayload } from '@/app/api/notify/route'
 import ProductImage from '@/app/components/ProductImage'
@@ -146,11 +146,12 @@ function ShareWithTeam({ show }: { show: Show }) {
 
 const EMPTY_CONTACT = { name: '', phone: '', email: '' }
 
-function ContactCard({ icon: Icon, role, value, onChange }: {
+function ContactCard({ icon: Icon, role, value, onChange, onBlurSave }: {
   icon: React.FC<{ size?: number; className?: string }>
   role: string
   value: { name: string; phone: string; email: string }
   onChange: (v: { name: string; phone: string; email: string }) => void
+  onBlurSave?: (v: { name: string; phone: string; email: string }) => void
 }) {
   return (
     <div className="bg-white border border-amber-200 rounded-2xl p-4 space-y-2.5">
@@ -164,6 +165,7 @@ function ContactCard({ icon: Icon, role, value, onChange }: {
         placeholder="Full name"
         value={value.name}
         onChange={e => onChange({ ...value, name: e.target.value })}
+        onBlur={e => onBlurSave?.({ ...value, name: e.target.value })}
         className="w-full text-sm bg-amber-50 border border-amber-200 text-gray-900 placeholder-gray-400 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
       />
       <div className="grid grid-cols-2 gap-2">
@@ -173,6 +175,7 @@ function ContactCard({ icon: Icon, role, value, onChange }: {
             placeholder="Phone"
             value={value.phone}
             onChange={e => onChange({ ...value, phone: e.target.value })}
+            onBlur={e => onBlurSave?.({ ...value, phone: e.target.value })}
             className="w-full text-sm bg-amber-50 border border-amber-200 text-gray-900 placeholder-gray-400 rounded-xl pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
           />
         </div>
@@ -182,6 +185,7 @@ function ContactCard({ icon: Icon, role, value, onChange }: {
             placeholder="Email"
             value={value.email}
             onChange={e => onChange({ ...value, email: e.target.value })}
+            onBlur={e => onBlurSave?.({ ...value, email: e.target.value })}
             className="w-full text-sm bg-amber-50 border border-amber-200 text-gray-900 placeholder-gray-400 rounded-xl pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
           />
         </div>
@@ -237,7 +241,6 @@ function DayOfShowSection({ show, onNotify }: { show: Show; onNotify: (p: Notify
           runOfShowText: rosMode === 'text' ? rosText : undefined,
           runOfShowPdfUrl: pdfUrl,
           curfew: hasCurfew ? curfewTime : 'none',
-          dayOfShowContacts: contacts,
           buyerAttachments: attachments.length > 0 ? attachments : undefined,
         })
       }
@@ -376,10 +379,10 @@ function DayOfShowSection({ show, onNotify }: { show: Show; onNotify: (p: Notify
         <div>
           <p className="text-xs font-black text-gray-700 uppercase tracking-wider mb-3">Day of Show Contacts</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ContactCard icon={Music}      role="Artist Relations"   value={contacts.artistRelations}   onChange={v => setContacts(c => ({ ...c, artistRelations: v }))} />
-            <ContactCard icon={Shield}     role="Head of Security"   value={contacts.headOfSecurity}    onChange={v => setContacts(c => ({ ...c, headOfSecurity: v }))} />
-            <ContactCard icon={DollarSign} role="Settlement Contact" value={contacts.settlement}        onChange={v => setContacts(c => ({ ...c, settlement: v }))} />
-            <ContactCard icon={Wrench}     role="Production Manager" value={contacts.productionManager} onChange={v => setContacts(c => ({ ...c, productionManager: v }))} />
+            <ContactCard icon={Music}      role="Artist Relations"   value={contacts.artistRelations}   onChange={v => setContacts(c => ({ ...c, artistRelations: v }))}   onBlurSave={v => upsertDayOfShowContact(show.id, 'artistRelations', v).catch(() => {})} />
+            <ContactCard icon={Shield}     role="Head of Security"   value={contacts.headOfSecurity}    onChange={v => setContacts(c => ({ ...c, headOfSecurity: v }))}    onBlurSave={v => upsertDayOfShowContact(show.id, 'headOfSecurity', v).catch(() => {})} />
+            <ContactCard icon={DollarSign} role="Settlement Contact" value={contacts.settlement}        onChange={v => setContacts(c => ({ ...c, settlement: v }))}        onBlurSave={v => upsertDayOfShowContact(show.id, 'settlement', v).catch(() => {})} />
+            <ContactCard icon={Wrench}     role="Production Manager" value={contacts.productionManager} onChange={v => setContacts(c => ({ ...c, productionManager: v }))} onBlurSave={v => upsertDayOfShowContact(show.id, 'productionManager', v).catch(() => {})} />
           </div>
         </div>
 
@@ -454,7 +457,7 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
     if (!isConfigured) return
     const unsub = subscribeToShow(id, async () => {
       const data = await getShow(id)
-      if (data) setMessages(data.messages)
+      if (data) { setMessages(data.messages); setItems(data.items) }
     })
     return unsub
   }, [id])

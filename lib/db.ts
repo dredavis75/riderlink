@@ -3,6 +3,23 @@ import type { Show, RiderItem, Message, ItemStatus, MasterRider, MasterRiderItem
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+const DAY_OF_SHOW_ROLES = ['artistRelations', 'headOfSecurity', 'settlement', 'productionManager'] as const
+
+// Folds the one-row-per-role day_of_show_roles join back into the fixed
+// 4-key shape the rest of the app expects — only the storage granularity
+// changed (per-role rows, to avoid one submitter clobbering another's role),
+// not the shape callers read.
+function foldDayOfShowRoles(rows: any[] | undefined): DayOfShowContacts | undefined {
+  if (!rows || rows.length === 0) return undefined
+  const byRole = new Map(rows.map(r => [r.role, r]))
+  const result = {} as DayOfShowContacts
+  for (const role of DAY_OF_SHOW_ROLES) {
+    const r = byRole.get(role)
+    result[role] = { name: r?.name ?? '', phone: r?.phone ?? '', email: r?.email ?? '' }
+  }
+  return result
+}
+
 function mapShow(row: any): Show {
   return {
     id: row.id,
@@ -28,7 +45,7 @@ function mapShow(row: any): Show {
     runOfShowText: row.run_of_show_text ?? undefined,
     runOfShowPdfUrl: row.run_of_show_pdf_url ?? undefined,
     curfew: row.curfew ?? undefined,
-    dayOfShowContacts: row.day_of_show_contacts ?? undefined,
+    dayOfShowContacts: foldDayOfShowRoles(row.day_of_show_roles),
     buyerAttachments: row.buyer_attachments ?? undefined,
     buyerCoversHotel: row.buyer_covers_hotel ?? false,
     buyerCoversFlights: row.buyer_covers_flights ?? false,
@@ -116,7 +133,7 @@ export async function getShows(workspaceId = 'default'): Promise<Show[]> {
   if (!isConfigured) throw new Error('Supabase not configured')
   const { data: shows, error } = await supabase
     .from('shows')
-    .select('*, rider_items(*), messages(*), hotels(*), rooming_guests(*), flights(*), buyer_contacts(*)')
+    .select('*, rider_items(*), messages(*), hotels(*), rooming_guests(*), flights(*), buyer_contacts(*), day_of_show_roles(*)')
     .eq('workspace_id', workspaceId)
     .order('date', { ascending: true })
 
@@ -129,7 +146,7 @@ export async function getShow(id: string): Promise<Show | null> {
   if (!isConfigured) throw new Error('Supabase not configured')
   const { data, error } = await supabase
     .from('shows')
-    .select('*, rider_items(*), messages(*), hotels(*), rooming_guests(*), flights(*), buyer_contacts(*)')
+    .select('*, rider_items(*), messages(*), hotels(*), rooming_guests(*), flights(*), buyer_contacts(*), day_of_show_roles(*)')
     .eq('id', id)
     .single()
 
@@ -391,7 +408,6 @@ export async function saveShowDayOfShow(
     runOfShowText?: string
     runOfShowPdfUrl?: string
     curfew?: string
-    dayOfShowContacts?: DayOfShowContacts
     buyerAttachments?: BuyerAttachment[]
   }
 ) {
@@ -399,9 +415,29 @@ export async function saveShowDayOfShow(
   if (data.runOfShowText !== undefined) fields.run_of_show_text = data.runOfShowText
   if (data.runOfShowPdfUrl !== undefined) fields.run_of_show_pdf_url = data.runOfShowPdfUrl
   if (data.curfew !== undefined) fields.curfew = data.curfew
-  if (data.dayOfShowContacts !== undefined) fields.day_of_show_contacts = data.dayOfShowContacts
-  if (data.buyerAttachments !== undefined) fields.buyer_attachments = data.buyerAttachments
+  if (data.buyerAttachments !== undefined) {
+    // Merge with whatever's already saved rather than overwrite — a second
+    // submission (e.g. from a different buyer-side contact) shouldn't wipe
+    // out files someone else already uploaded.
+    const { data: existing } = await supabase.from('shows').select('buyer_attachments').eq('id', showId).single()
+    const prior = (existing?.buyer_attachments ?? []) as BuyerAttachment[]
+    fields.buyer_attachments = [...prior, ...data.buyerAttachments]
+  }
   const { error } = await supabase.from('shows').update(fields).eq('id', showId)
+  if (error) throw error
+}
+
+// Upserts a single day-of-show contact role — each role lives in its own
+// row so two different people editing different roles at the same time
+// can't clobber each other (see day-of-show-contacts.sql).
+export async function upsertDayOfShowContact(
+  showId: string,
+  role: keyof DayOfShowContacts,
+  fields: { name?: string; phone?: string; email?: string }
+): Promise<void> {
+  const { error } = await supabase
+    .from('day_of_show_roles')
+    .upsert({ show_id: showId, role, ...fields, updated_at: new Date().toISOString() }, { onConflict: 'show_id,role' })
   if (error) throw error
 }
 
