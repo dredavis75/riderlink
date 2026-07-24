@@ -708,6 +708,22 @@ export default function BuyerPortal({ params }: { params: Promise<{ id: string }
               </p>
             )}
             <p className="text-xs text-gray-400 mt-3">The tour manager has been notified.</p>
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-5">
+              <a
+                href={`/api/pdf/${show.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-black text-sm px-5 py-3 rounded-xl transition-colors shadow-lg shadow-amber-500/20"
+              >
+                <Download size={14} /> Download Printable Rider
+              </a>
+              <button
+                onClick={() => setApproved(false)}
+                className="inline-flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-black text-sm px-5 py-3 rounded-xl border border-gray-200 transition-colors"
+              >
+                <RefreshCw size={14} /> Edit Rider
+              </button>
+            </div>
           </div>
         ) : (
           <>
