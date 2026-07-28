@@ -1005,6 +1005,32 @@ export async function deleteManagementContact(id: string): Promise<void> {
   await supabase.from('artist_management').delete().eq('id', id)
 }
 
+// ── Share Email History ───────────────────────────────────────────────────────
+
+export async function getShareEmailHistory(workspaceId = 'default'): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from('share_email_history')
+      .select('email')
+      .eq('workspace_id', workspaceId)
+      .order('last_used_at', { ascending: false })
+    if (error) throw error
+    return (data ?? []).map(r => r.email as string)
+  } catch {
+    return []
+  }
+}
+
+export async function recordShareEmails(emails: string[], workspaceId = 'default'): Promise<void> {
+  if (!emails.length) return
+  try {
+    await supabase.from('share_email_history').upsert(
+      emails.map(e => ({ workspace_id: workspaceId, email: e.toLowerCase(), last_used_at: new Date().toISOString() })),
+      { onConflict: 'workspace_id,email' }
+    )
+  } catch { /* table may not exist yet if the migration hasn't been run */ }
+}
+
 // ── Community Photos ──────────────────────────────────────────────────────────
 
 export interface CommunityPhoto {

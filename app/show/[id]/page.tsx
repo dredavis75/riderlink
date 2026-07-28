@@ -11,7 +11,7 @@ import { MOCK_SHOWS, STATUS_CONFIG, SHOW_STATUS_CONFIG, OFFICIAL_RIDER_PDFS, FLI
 import {
   getShow, updateItem, deleteShowItem, sendMessage, subscribeToShow, updateBuyer, markBuyerInvited, updateShowStatus, updateShowVenue, resetShowRiderFromMaster, addShowItem, getAllManagementContacts, type ManagementContact,
   addHotel, updateHotel, deleteHotel, deleteRoomingGuest, addFlight, updateFlight, deleteFlight, updateShowTravelFlags,
-  propagateItemImageToMaster,
+  propagateItemImageToMaster, getShareEmailHistory, recordShareEmails,
 } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import ArtistAvatar from '@/app/components/ArtistAvatar'
@@ -22,7 +22,6 @@ import HotelVenueMap from '@/app/components/HotelVenueMap'
 import RoomingListEditor from '@/app/components/RoomingListEditor'
 
 const PARTY_LABELS = ['A', 'B', 'C', 'D', 'E', 'F']
-const SHARE_EMAIL_HISTORY_KEY = 'riderlink-share-email-history'
 
 const ARTIST_COLORS: Record<string, string> = {
   'G Herbo':     'from-emerald-600 to-emerald-800',
@@ -182,10 +181,7 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   }, [])
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(SHARE_EMAIL_HISTORY_KEY)
-      if (saved) setShareEmailHistory(JSON.parse(saved))
-    } catch {}
+    getShareEmailHistory('default').then(setShareEmailHistory).catch(() => {})
   }, [])
 
   if (!show) return <div className="p-8 text-gray-500">Show not found.</div>
@@ -362,9 +358,9 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
       if (!res.ok) throw new Error(data.error ?? data.details ?? `Status ${res.status}`)
       setShareResult(`✓ Sent to ${data.sent} ${data.sent === 1 ? 'person' : 'people'}`)
       setShareEmails('')
-      const merged = Array.from(new Set([...list.map(e => e.toLowerCase()), ...shareEmailHistory]))
-      setShareEmailHistory(merged)
-      try { localStorage.setItem(SHARE_EMAIL_HISTORY_KEY, JSON.stringify(merged)) } catch {}
+      const lower = list.map(e => e.toLowerCase())
+      setShareEmailHistory(prev => Array.from(new Set([...lower, ...prev])))
+      recordShareEmails(lower, 'default').catch(() => {})
     } catch (e: any) { setShareResult('✕ ' + e.message) }
     finally { setSharing(false) }
   }
