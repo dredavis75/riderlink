@@ -22,6 +22,7 @@ import HotelVenueMap from '@/app/components/HotelVenueMap'
 import RoomingListEditor from '@/app/components/RoomingListEditor'
 
 const PARTY_LABELS = ['A', 'B', 'C', 'D', 'E', 'F']
+const SHARE_EMAIL_HISTORY_KEY = 'riderlink-share-email-history'
 
 const ARTIST_COLORS: Record<string, string> = {
   'G Herbo':     'from-emerald-600 to-emerald-800',
@@ -97,6 +98,8 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
   const [shareEmails, setShareEmails] = useState('')
   const [sharing, setSharing]         = useState(false)
   const [shareResult, setShareResult] = useState<string | null>(null)
+  const [shareEmailHistory, setShareEmailHistory] = useState<string[]>([])
+  const [showShareSuggestions, setShowShareSuggestions] = useState(false)
   const [buyerOpen, setBuyerOpen]     = useState(false)
   const [buyerName, setBuyerName]     = useState('')
   const [buyerEmail, setBuyerEmail]   = useState('')
@@ -176,6 +179,13 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SHARE_EMAIL_HISTORY_KEY)
+      if (saved) setShareEmailHistory(JSON.parse(saved))
+    } catch {}
   }, [])
 
   if (!show) return <div className="p-8 text-gray-500">Show not found.</div>
@@ -352,8 +362,30 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
       if (!res.ok) throw new Error(data.error ?? data.details ?? `Status ${res.status}`)
       setShareResult(`✓ Sent to ${data.sent} ${data.sent === 1 ? 'person' : 'people'}`)
       setShareEmails('')
+      const merged = Array.from(new Set([...list.map(e => e.toLowerCase()), ...shareEmailHistory]))
+      setShareEmailHistory(merged)
+      try { localStorage.setItem(SHARE_EMAIL_HISTORY_KEY, JSON.stringify(merged)) } catch {}
     } catch (e: any) { setShareResult('✕ ' + e.message) }
     finally { setSharing(false) }
+  }
+
+  function currentShareToken(): string {
+    const parts = shareEmails.split(/[\s,;]+/)
+    return (parts[parts.length - 1] ?? '').trim().toLowerCase()
+  }
+
+  function shareSuggestions(): string[] {
+    const token = currentShareToken()
+    if (!token) return []
+    const already = new Set(shareEmails.split(/[\s,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean))
+    return shareEmailHistory.filter(e => e.startsWith(token) && !already.has(e)).slice(0, 5)
+  }
+
+  function pickShareSuggestion(email: string) {
+    const parts = shareEmails.split(/[\s,;]+/)
+    parts[parts.length - 1] = email
+    setShareEmails(parts.filter(Boolean).join(', ') + ', ')
+    setShowShareSuggestions(false)
   }
 
   async function handleConfirmStatusChange() {
@@ -854,10 +886,25 @@ export default function ShowDetail({ params }: { params: Promise<{ id: string }>
                 </button>
               ))}
             </div>
-            <div className="flex gap-2">
-              <input value={shareEmails} onChange={e => setShareEmails(e.target.value)}
-                placeholder="or type emails…"
-                className="flex-1 text-sm bg-amber-50 border border-amber-200 text-gray-900 placeholder-gray-400 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500 min-w-0" />
+            <div className="flex gap-2 relative">
+              <div className="flex-1 min-w-0 relative">
+                <input value={shareEmails}
+                  onChange={e => { setShareEmails(e.target.value); setShowShareSuggestions(true) }}
+                  onFocus={() => setShowShareSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowShareSuggestions(false), 150)}
+                  placeholder="or type emails…"
+                  className="w-full text-sm bg-amber-50 border border-amber-200 text-gray-900 placeholder-gray-400 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                {showShareSuggestions && shareSuggestions().length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-amber-200 rounded-xl shadow-lg overflow-hidden">
+                    {shareSuggestions().map(email => (
+                      <button key={email} type="button" onMouseDown={() => pickShareSuggestion(email)}
+                        className="w-full text-left px-3.5 py-2 text-sm text-gray-800 hover:bg-amber-50 transition-colors border-b border-amber-100 last:border-0">
+                        {email}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button onClick={handleShare} disabled={sharing || !shareEmails.trim()}
                 className="shrink-0 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold text-sm px-4 py-2.5 rounded-xl disabled:opacity-40 transition-colors">
                 {sharing ? <Loader2 size={13} className="animate-spin" /> : 'Send'}
