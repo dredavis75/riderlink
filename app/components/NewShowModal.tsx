@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, ChevronRight, CheckCircle2, Loader2, MapPin } from 'lucide-react'
 import { ARTIST_ROSTER, RIDER_TEMPLATES, type RiderTemplate } from '@/lib/data'
-import { createShow } from '@/lib/db'
+import { createShow, getRiderMaster } from '@/lib/db'
 
 interface Props {
   onClose: () => void
@@ -135,25 +135,39 @@ export default function NewShowModal({ onClose, workspaceId = 'default' }: Props
     setLookingUpAddress(false)
   }
 
-  // Step 2
-  const defaultItems = (): RiderTemplate[] =>
-    (RIDER_TEMPLATES[artist] ?? []).map(i => ({ ...i }))
+  // Step 2 — the rider should always be a given, pulled live from the Rider
+  // Library for this artist. The static RIDER_TEMPLATES map is only a fallback
+  // for artists that don't have a library master rider yet.
+  const [templateSource, setTemplateSource] = useState<RiderTemplate[]>([])
+  const [loadingMaster, setLoadingMaster] = useState(false)
+  const defaultItems = (): RiderTemplate[] => templateSource.map(i => ({ ...i }))
 
   const [useTemplate, setUseTemplate] = useState(true)
-  const [items, setItems] = useState<RiderTemplate[]>(defaultItems)
+  const [items, setItems] = useState<RiderTemplate[]>([])
 
   const handleArtistChange = (a: string) => {
     setArtist(a)
-    setItems((RIDER_TEMPLATES[a] ?? []).map(i => ({ ...i })))
-    setUseTemplate(!!(RIDER_TEMPLATES[a]))
   }
 
   const step1Valid = artist && venue.trim() && city.trim() && date && buyerName.trim() && buyerEmail.trim()
 
-  const goToStep2 = () => {
+  const goToStep2 = async () => {
     if (!step1Valid) return
-    setItems(useTemplate ? defaultItems() : [])
-    setUseTemplate(!!(RIDER_TEMPLATES[artist]))
+    setLoadingMaster(true)
+    let source: RiderTemplate[] = (RIDER_TEMPLATES[artist] ?? []).map(i => ({ ...i }))
+    try {
+      const master = await getRiderMaster(artist)
+      if (master?.items?.length) {
+        source = master.items
+          .slice()
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map(i => ({ category: i.category, name: i.name, quantity: i.quantity, notes: i.notes }))
+      }
+    } catch { /* fall back to the static template on any lookup failure */ }
+    setTemplateSource(source)
+    setUseTemplate(source.length > 0)
+    setItems(source.map(i => ({ ...i })))
+    setLoadingMaster(false)
     setStep(1)
   }
 
@@ -418,7 +432,7 @@ export default function NewShowModal({ onClose, workspaceId = 'default' }: Props
 
           {step === 1 && (
             <div className="space-y-4">
-              {RIDER_TEMPLATES[artist] && (
+              {templateSource.length > 0 && (
                 <div className="flex gap-3">
                   <button
                     onClick={() => { setUseTemplate(true); setItems(defaultItems()) }}
@@ -496,10 +510,10 @@ export default function NewShowModal({ onClose, workspaceId = 'default' }: Props
           {step === 0 ? (
             <button
               onClick={goToStep2}
-              disabled={!step1Valid}
+              disabled={!step1Valid || loadingMaster}
               className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm font-bold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Next: Rider <ChevronRight size={14} />
+              {loadingMaster ? <><Loader2 size={14} className="animate-spin" /> Loading rider…</> : <>Next: Rider <ChevronRight size={14} /></>}
             </button>
           ) : (
             <button
