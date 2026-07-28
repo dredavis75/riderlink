@@ -207,17 +207,22 @@ export async function POST(
     let masterId: string | null = null
     const { data: existing } = await sb
       .from('rider_masters')
-      .select('id')
+      .select('id, pdf_url')
       .eq('artist', artist)
       .single()
 
     if (existing) {
       masterId = existing.id
       await sb.from('rider_master_items').delete().eq('master_id', masterId)
+      // Only fill in the master's PDF if it doesn't already have one —
+      // never silently overwrite a PDF that was deliberately set in the library.
+      if (!existing.pdf_url && pdfs[0]?.url) {
+        await sb.from('rider_masters').update({ pdf_url: pdfs[0].url }).eq('id', masterId)
+      }
     } else {
       const { data: newMaster } = await sb
         .from('rider_masters')
-        .insert({ artist, version: '1.0' })
+        .insert({ artist, version: '1.0', pdf_url: pdfs[0]?.url ?? null })
         .select('id')
         .single()
       masterId = newMaster?.id ?? null
